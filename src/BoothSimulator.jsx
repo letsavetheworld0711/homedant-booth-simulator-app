@@ -398,6 +398,37 @@ const PRODUCT_LIBRARY = [
   },
 
   {
+    id: 'ex_staff',
+    brand: 'Exhibition',
+    category: 'Booth Staff',
+    name: 'Booth Staff',
+    type: 'staff',
+    defaultSize: { width: 500, depth: 300, height: 1750 },
+    sizeOptions: { width: [500], depth: [300], height: [1600, 1650, 1700, 1750, 1800, 1850] },
+    tierOptions: [1],
+    defaultTier: 1,
+    frameColors: ['navy'],
+    boardColors: ['none'],
+    addOns: [],
+  },
+
+  {
+    id: 'ex_staff_lee',
+    brand: 'Exhibition',
+    category: 'Booth Staff',
+    name: 'Manager Lee',
+    type: 'staff',
+    preset: 'coat',
+    defaultSize: { width: 500, depth: 300, height: 1750 },
+    sizeOptions: { width: [500], depth: [300], height: [1600, 1650, 1700, 1750, 1800, 1850] },
+    tierOptions: [1],
+    defaultTier: 1,
+    frameColors: ['navy'],
+    boardColors: ['none'],
+    addOns: [],
+  },
+
+  {
     id: 'ex_catalog',
     brand: 'Exhibition',
     category: 'Catalog Stand',
@@ -1139,6 +1170,18 @@ const KO = {
   "Washing machine": "세탁기",
   "The washing machine does not fit. Use a width of 700 or more and raise the lowest level.": "세탁기가 들어가지 않습니다. 폭을 700 이상으로 하고 가장 아래 단을 올려주세요.",
   "Laptop": "노트북",
+  "Booth Staff": "부스 직원",
+  "Manager Lee": "이과장",
+  "Staff": "직원",
+  "Name tag": "이름표",
+  "Glasses": "안경",
+  "Shirt": "상의",
+  "Hair": "머리",
+  "short": "짧은 머리",
+  "parted": "가르마",
+  "navy": "네이비",
+  "grey": "그레이",
+  "blue": "블루",
   "TV": "TV",
   "Hanger bars": "행거봉 수",
   "Choose an item for each spot, left to right. Level 1 is the lowest.": "칸마다 놓을 물건을 고르세요. 왼쪽부터 순서대로이고, 1번이 가장 아랫단입니다.",
@@ -3809,6 +3852,234 @@ function buildCatalogStand(group, p) {
   }
 }
 
+/* A cartoon booth staff member: big head, simple face, a lanyard name
+   tag. Not a likeness of anyone; the name tag, glasses, shirt and hair
+   are set in the side panel so the figure can be dressed up for fun.  */
+const STAFF_SHIRTS = { navy: 0x26324a, black: 0x1d1e21, white: 0xe9e9e6, grey: 0x7d8086, blue: 0x5b83b8 };
+function buildStaff(group, p, tpl) {
+  // fixed look: brown hair parted just off centre with the fringe swept
+  // to both sides, round black glasses, and a dark suit with white shirt
+  // and tie
+  const coat = tpl && tpl.preset === 'coat';
+  if (coat) p = { ...p, staffGlasses: true, staffName: p.staffName ?? '이과장' };
+  const H = p.height * MM_TO_M;
+  const k = H / 1.75;
+  const g = new THREE.Group();
+  g.scale.setScalar(k);
+  group.add(g);
+  const mat = (c, r = 0.85) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: 0 });
+  const add = (parent, geo, m, x, y, z) => {
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  };
+  const skin = mat(0xd9ad8c, 0.7);
+  const shirt = coat ? mat(0x2a2f3a, 0.8) : mat(STAFF_SHIRTS[p.staffShirt] || STAFF_SHIRTS.navy, 0.9);
+  const pants = coat ? shirt : mat(0x2b2e35, 0.9);
+  const shoe = mat(0x161616, 0.5);
+  const hair = mat(coat ? 0x4a3325 : 0x1b1714, 0.8);
+  const white = mat(0xeeeeec, 0.8);
+  const tie = mat(0x3a2a4a, 0.6);
+  if (coat) shirt.side = THREE.DoubleSide;
+  const dark = mat(0x111111, 0.4);
+
+  // legs and shoes
+  [-0.09, 0.09].forEach((x) => {
+    add(g, new THREE.CylinderGeometry(0.068, 0.058, 0.78, 14), pants, x, 0.43, 0);
+    const sh = add(g, new THREE.BoxGeometry(0.1, 0.06, 0.2), shoe, x, 0.03, 0.03);
+    sh.geometry.translate(0, 0, 0);
+  });
+  // body
+  if (coat) {
+    // white shirt and tie, seen in the V of the jacket
+    const inner = add(g, new THREE.CylinderGeometry(0.19, 0.165, 0.58, 20), white, 0, 1.07, 0);
+    inner.scale.z = 0.6;
+    add(g, new THREE.CylinderGeometry(0.06, 0.07, 0.07, 14), skin, 0, 1.385, 0); // neck
+    [-1, 1].forEach((s) => {
+      const c = add(g, new THREE.BoxGeometry(0.08, 0.05, 0.012), white, s * 0.04, 1.34, 0.108);
+      c.rotation.z = s * 0.6;
+    });
+    add(g, new THREE.BoxGeometry(0.035, 0.03, 0.02), tie, 0, 1.325, 0.112); // knot
+    const blade = add(g, new THREE.CylinderGeometry(0.024, 0.036, 0.3, 4), tie, 0, 1.16, 0.114);
+    blade.rotation.y = Math.PI / 4;
+    blade.scale.z = 0.25;
+    // jacket: buttoned, open in a V at the chest, down to the hip
+    const gap = 0.3;
+    const shell = add(g, new THREE.CylinderGeometry(0.212, 0.2, 0.6, 28, 1, true, gap, Math.PI * 2 - 2 * gap), shirt, 0, 1.08, 0);
+    shell.scale.z = 0.64;
+    const lower = add(g, new THREE.CylinderGeometry(0.2, 0.205, 0.2, 28), shirt, 0, 0.87, 0); // closed below the button
+    lower.scale.z = 0.64;
+    add(g, new THREE.CylinderGeometry(0.1, 0.212, 0.04, 28), shirt, 0, 1.39, 0).scale.z = 0.64; // shoulders
+    [-1, 1].forEach((s) => {
+      const lap = add(g, new THREE.BoxGeometry(0.06, 0.3, 0.012), shirt, s * 0.07, 1.2, 0.128);
+      lap.rotation.set(-0.1, s * 0.3, s * 0.28);
+    });
+    add(g, new THREE.SphereGeometry(0.011, 10, 8), mat(0x111111, 0.4), 0, 0.99, 0.133); // button
+  } else {
+    const torso = add(g, new THREE.CylinderGeometry(0.2, 0.17, 0.56, 20), shirt, 0, 1.08, 0);
+    torso.scale.z = 0.62;
+    add(g, new THREE.CylinderGeometry(0.06, 0.07, 0.07, 14), skin, 0, 1.38, 0); // neck
+    // collar
+    [-1, 1].forEach((s) => {
+      const c = add(g, new THREE.BoxGeometry(0.09, 0.05, 0.012), shirt, s * 0.045, 1.335, 0.105);
+      c.rotation.z = s * 0.55;
+    });
+  }
+  // arms: left down, right raised in a wave
+  const armGeo = new THREE.CylinderGeometry(0.048, 0.04, 0.56, 12);
+  armGeo.translate(0, -0.28, 0);
+  const handGeo = new THREE.SphereGeometry(0.05, 12, 10);
+  const armL = add(g, armGeo, shirt, -0.235, 1.33, 0);
+  armL.rotation.z = -0.12;
+  add(armL, handGeo, skin, 0, -0.6, 0);
+  const armR = add(g, armGeo, shirt, 0.235, 1.33, 0);
+  armR.rotation.z = 2.55;
+  add(armR, handGeo, skin, 0, -0.6, 0);
+
+  // head: larger than life, for a cartoon look
+  const head = new THREE.Group();
+  head.position.set(0, 1.6, 0);
+  g.add(head);
+  const R = 0.165;
+  const face = add(head, new THREE.SphereGeometry(R, 32, 24), skin, 0, 0, 0);
+  face.scale.set(1, 1.08, 0.98);
+  [-1, 1].forEach((s) => add(head, new THREE.SphereGeometry(0.035, 12, 10), skin, s * R * 0.98, -0.01, 0));
+  // hair cap
+  const cap = add(head, new THREE.SphereGeometry(R * 1.07, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.48), hair, 0, 0.012, -0.012);
+  cap.rotation.x = -0.32;
+  cap.scale.set(1, 1.05, 1);
+  if (coat) {
+    cap.visible = false;
+    // Side parting (가르마): a line on top of the head a little to the left
+    // as you face him. From that line the hair is combed two ways: a big
+    // sweep falls diagonally across the forehead to the right temple, and
+    // a shorter side falls to the left, so the forehead shows as a
+    // triangle under the parting.
+    const full = R * 1.12;
+    const SC = [1.04, 1.1, 1.04],
+      OFF = [0, 0.008, -0.006];
+    hair.side = THREE.DoubleSide;
+    const onHead = (r, ph, th) => [
+      -r * Math.cos(ph) * Math.sin(th) * SC[0] + OFF[0],
+      r * Math.cos(th) * SC[1] + OFF[1],
+      r * Math.sin(ph) * Math.sin(th) * SC[2] + OFF[2],
+    ];
+    // a patch of the hair shell between two angles round the head, each
+    // column running from the crown down to where that column ends
+    const patch = (r, ph0, ph1, end, nPh = 48, nTh = 14) => {
+      const pos = [],
+        nor = [],
+        idx = [];
+      for (let i = 0; i <= nPh; i++) {
+        const ph = ph0 + ((ph1 - ph0) * i) / nPh;
+        const te = end(ph);
+        for (let j = 0; j <= nTh; j++) {
+          const th = (te * j) / nTh;
+          const v = onHead(r, ph, th);
+          pos.push(...v);
+          const n = new THREE.Vector3(-Math.cos(ph) * Math.sin(th), Math.cos(th), Math.sin(ph) * Math.sin(th));
+          nor.push(n.x, n.y, n.z);
+        }
+      }
+      for (let i = 0; i < nPh; i++)
+        for (let j = 0; j < nTh; j++) {
+          const a0 = i * (nTh + 1) + j,
+            b0 = a0 + nTh + 1;
+          idx.push(a0, b0, a0 + 1, b0, b0 + 1, a0 + 1);
+        }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      geo.setIndex(idx);
+      return add(head, geo, hair, 0, 0, 0);
+    };
+    const partPhi = Math.PI / 2 - 0.24; // left of centre as you face him
+    const top = Math.PI * 0.1; // the hairline at the parting
+    // big side: drops fast from the parting, then runs along the brow
+    patch(full * 1.01, partPhi, partPhi + 1.5, (ph) => {
+      const u = Math.min(1, (ph - partPhi) / 0.85);
+      return top + Math.PI * (0.31 * (1 - (1 - u) * (1 - u)) + (ph - partPhi > 1.1 ? 0.06 : 0));
+    });
+    // short side: a gentler slope down to the left temple
+    patch(full * 1.01, partPhi - 1.45, partPhi, (ph) => {
+      const u = Math.min(1, (partPhi - ph) / 0.6);
+      return top + Math.PI * (0.3 * (1 - (1 - u) * (1 - u)) + (partPhi - ph > 1.15 ? 0.06 : 0));
+    });
+    // back and sides, down past the ears
+    patch(full, partPhi + 1.4, partPhi - 1.35 + Math.PI * 2, () => Math.PI * 0.6, 40, 16);
+    // the parting line itself, from the hairline back over the crown
+    const seam = [];
+    for (let k = 0; k <= 8; k++) seam.push(new THREE.Vector3(...onHead(full * 1.025, partPhi, top * (1 - k / 8) + 0.02)));
+    add(head, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seam), 16, 0.0028, 6), mat(0x24170f, 0.9), 0, 0, 0);
+    // volume where the big side lifts off the parting and rolls over
+    const roll = add(head, new THREE.SphereGeometry(R * 0.42, 18, 12), hair, 0.05, R * 0.86, R * 0.42);
+    roll.scale.set(1.35, 0.42, 0.85);
+    roll.rotation.set(0.35, 0, -0.42);
+  } else if (p.staffHair === 'parted') {
+    const sweep = add(head, new THREE.SphereGeometry(R * 0.62, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), hair, -0.05, R * 0.72, R * 0.42);
+    sweep.rotation.set(0.55, 0, 0.35);
+    sweep.scale.set(1.25, 0.45, 0.8);
+  } else {
+    const fringe = add(head, new THREE.BoxGeometry(R * 1.5, 0.035, 0.05), hair, 0, R * 0.62, R * 0.7);
+    fringe.rotation.x = 0.5;
+  }
+  // eyes, brows, nose, smile
+  const zf = R * 0.93;
+  [-1, 1].forEach((s) => {
+    add(head, new THREE.SphereGeometry(0.017, 12, 10), dark, s * 0.055, 0.02, zf);
+    const brow = add(head, new THREE.BoxGeometry(0.05, 0.011, 0.01), hair, s * 0.057, 0.068, zf - 0.006);
+    brow.rotation.z = -s * 0.1;
+  });
+  add(head, new THREE.SphereGeometry(0.018, 10, 8), skin, 0, -0.018, R * 1.0);
+  const smile = add(head, new THREE.TorusGeometry(0.04, 0.0065, 8, 20, Math.PI * 0.8), mat(0x7a3b33, 0.6), 0, -0.045, zf - 0.008);
+  smile.rotation.z = Math.PI + Math.PI * 0.1;
+  if (p.staffGlasses) {
+    const frame = mat(0x151515, 0.35);
+    [-1, 1].forEach((s) => {
+      add(head, new THREE.TorusGeometry(coat ? 0.04 : 0.036, coat ? 0.0075 : 0.0055, 10, 28), frame, s * 0.058, 0.02, zf + 0.018);
+      // temple: from the outer edge of the lens back into the hair
+      add(head, new THREE.BoxGeometry(0.006, 0.006, 0.07), frame, s * (coat ? 0.1 : 0.094), 0.022, zf - 0.01);
+    });
+    add(head, new THREE.BoxGeometry(0.04, 0.005, 0.005), frame, 0, 0.026, zf + 0.02);
+  }
+
+  // lanyard and name tag
+  const strap = mat(0x2f5fa8, 0.7);
+  if (!coat) [-1, 1].forEach((s) => {
+    const st = add(g, new THREE.BoxGeometry(0.014, 0.24, 0.004), strap, s * 0.05, 1.24, 0.118);
+    st.rotation.z = -s * 0.32;
+  });
+  const name = (p.staffName || '').trim() || tr('Staff');
+  const c = document.createElement('canvas');
+  c.width = 320;
+  c.height = 200;
+  const x = c.getContext('2d');
+  x.fillStyle = '#ffffff';
+  x.fillRect(0, 0, 320, 200);
+  x.fillStyle = '#2f5fa8';
+  x.fillRect(0, 0, 320, 46);
+  x.fillStyle = '#ffffff';
+  x.font = 'bold 30px Arial, sans-serif';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.fillText('HOMEDANT', 160, 24);
+  x.fillStyle = '#111111';
+  x.font = `bold ${name.length > 6 ? 46 : 64}px "Noto Sans KR", "Malgun Gothic", Arial, sans-serif`;
+  x.fillText(name, 160, 124, 296);
+  const tagTex = new THREE.CanvasTexture(c);
+  tagTex.anisotropy = 4;
+  const tag = coat
+    ? add(g, new THREE.BoxGeometry(0.11, 0.07, 0.004), mat(0xffffff), -0.135, 1.2, 0.128)
+    : add(g, new THREE.BoxGeometry(0.11, 0.07, 0.004), mat(0xffffff), 0, 1.1, 0.123);
+  if (coat) tag.rotation.y = -0.45;
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(0.108, 0.068), new THREE.MeshBasicMaterial({ map: tagTex }));
+  front.position.set(0, 0, 0.0025);
+  tag.add(front);
+}
+
 function buildTVStand(group, p) {
   const w = p.width * MM_TO_M,
     h = p.height * MM_TO_M,
@@ -3893,6 +4164,9 @@ function buildProductMesh(p, tpl) {
       break;
     case 'tv':
       buildTVStand(group, p);
+      break;
+    case 'staff':
+      buildStaff(group, p, tpl);
       break;
     default:
       buildShelf(group, p, tpl);
@@ -4362,7 +4636,7 @@ export default function BoothSimulator() {
         Array.isArray(p.levels)
           ? p.levels.map((l) => `${l.h}${l.style}`).join('.')
           : ''
-      }-${p.hangers || ''}-${
+      }-${p.hangers || ''}-${p.staffName || ''}${p.staffGlasses ? 'G' : ''}${p.staffHair || ''}${p.staffShirt || ''}-${
         p.showItems
           ? `items${propsReady ? 'R' : ''}${JSON.stringify(p.itemPicks || '')}${p.baseItem || ''}`
           : ''
@@ -5619,7 +5893,10 @@ function PropertyPanel({
         )}
       </Section>
 
+      {tpl.type === 'staff' && <StaffEditor product={product} update={update} fixed={!!tpl.preset} />}
+
       {/* colors */}
+      {tpl.type !== 'staff' && (
       <Section title={tr('Colors')}>
         <Field label={tr('Frame')}>
           <div className="flex gap-1.5">
@@ -5682,6 +5959,7 @@ function PropertyPanel({
           </Field>
         )}
       </Section>
+      )}
 
       {tpl.brand === 'HOMEDANT HOUSE' && HH_ITEM_TYPES.includes(tpl.type) && (
         <HHItemEditor product={product} tpl={tpl} update={update} />
@@ -6078,6 +6356,55 @@ function HHLevelEditor({ product, tpl, update }) {
   );
 }
 
+function StaffEditor({ product, update, fixed }) {
+  const btn = (on) =>
+    `flex-1 text-xs py-1.5 rounded border transition ${
+      on ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+    }`;
+  return (
+    <Section title={tr('Staff')}>
+      <Field label={tr('Name tag')}>
+        <input
+          type="text"
+          value={product.staffName ?? (fixed ? '이과장' : '')}
+          maxLength={12}
+          onChange={(e) => update({ staffName: e.target.value })}
+          className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+        />
+      </Field>
+      {!fixed && (<>
+      <Field label={tr('Glasses')}>
+        <div className="flex gap-1.5">
+          {[false, true].map((on) => (
+            <button key={String(on)} onClick={() => update({ staffGlasses: on })} className={btn(!!product.staffGlasses === on)}>
+              {tr(on ? 'on' : 'off')}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label={tr('Hair')}>
+        <div className="flex gap-1.5">
+          {['short', 'parted'].map((v) => (
+            <button key={v} onClick={() => update({ staffHair: v })} className={btn((product.staffHair || 'short') === v)}>
+              {tr(v)}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label={tr('Shirt')}>
+        <div className="flex gap-1.5 flex-wrap">
+          {Object.keys(STAFF_SHIRTS).map((v) => (
+            <button key={v} onClick={() => update({ staffShirt: v })} className={btn((product.staffShirt || 'navy') === v)}>
+              {tr(v)}
+            </button>
+          ))}
+        </div>
+      </Field>
+      </>)}
+    </Section>
+  );
+}
+
 function Section({ title, children }) {
   return (
     <div className="px-4 py-3 border-b border-gray-200">
@@ -6201,6 +6528,15 @@ function ProductThumb({ type, tpl, product }) {
         <line x1="5" y1="11" x2="19" y2="11" />
         <circle cx="8" cy="21" r="1.3" />
         <circle cx="16" cy="21" r="1.3" />
+      </svg>
+    );
+  }
+  if (type === 'staff') {
+    return (
+      <svg viewBox="0 0 24 24" className={common} fill="none" stroke={stroke} strokeWidth="1.4">
+        <circle cx="12" cy="6" r="3.2" />
+        <path d="M6 21v-6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v6" />
+        <rect x="10.5" y="14" width="3" height="2" />
       </svg>
     );
   }
