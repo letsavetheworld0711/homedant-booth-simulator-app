@@ -1076,6 +1076,19 @@ const KO = {
   "TV Stand": "TV 거치대",
   "Logo Table": "로고 테이블",
   "Display items": "진열 물건",
+  "Auto": "자동",
+  "None": "없음",
+  "Box": "상자",
+  "Basket": "바구니",
+  "Books": "책",
+  "Books (flat)": "눕힌 책",
+  "Jars": "유리병",
+  "Plant": "화분",
+  "Towels": "수건",
+  "Soccer ball": "축구공",
+  "Suitcase": "캐리어",
+  "Choose an item for each spot, left to right. Level 1 is the lowest.": "칸마다 놓을 물건을 고르세요. 왼쪽부터 순서대로이고, 1번이 가장 아랫단입니다.",
+  "Reset to auto": "자동으로 되돌리기",
   "off": "끔",
   "on": "켬",
   "additional shelf": "추가 선반",
@@ -1902,7 +1915,8 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
         top,
         Math.min(clear, 0.75),
         hashSeed(hh.product.instanceId || 'item') + i * 977,
-        basket ? 0.012 : 0
+        basket ? 0.012 : 0,
+        hh.product.itemPicks ? hh.product.itemPicks[i] : null
       );
     }
   }
@@ -1973,37 +1987,95 @@ function displayKit(group, seed) {
   return { rng, R, pick, mat, put, sub };
 }
 
+/* Item types the user can pick for a slot, with the free height each
+   needs at full size. A picked item that is a little too tall for its
+   level is scaled down to fit; one that is far too tall is left out.   */
+const DISPLAY_ITEMS = [
+  ['box', 'Box', 0.1],
+  ['basket', 'Basket', 0.1],
+  ['booksUp', 'Books', 0.3],
+  ['booksFlat', 'Books (flat)', 0.08],
+  ['jars', 'Jars', 0.22],
+  ['plant', 'Plant', 0.42],
+  ['towels', 'Towels', 0.08],
+  ['ball', 'Soccer ball', 0.24],
+  ['suitcase', 'Suitcase', 0.64],
+];
+const DISPLAY_NEED = Object.fromEntries(DISPLAY_ITEMS.map((d) => [d[0], d[2]]));
+/* how many item slots a level of this width has (w in metres) */
+function displaySlotCount(w, basket) {
+  const usableW = w - (basket ? 0.024 : 0) - 0.07;
+  return usableW >= 1.0 ? 3 : usableW >= 0.6 ? 2 : 1;
+}
+
 /* Fill one shelf level. yTop = top surface of the board, clear = free
-   height above it, inset = extra margin when the board sits in a basket */
-function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0) {
-  const { rng, R, pick, mat, put, sub } = displayKit(group, seed);
+   height above it, inset = extra margin when the board sits in a basket.
+   picks = the user's choice per slot: an item type, 'none', or
+   'auto' / missing to let the simulator choose.                       */
+function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0, picks = null) {
   const usableW = w - 2 * inset - 0.07;
   const usableD = d - 2 * inset - 0.07;
   if (clear < 0.08 || usableW < 0.15 || usableD < 0.15) return;
-  const slots = usableW >= 1.0 ? 3 : usableW >= 0.6 ? 2 : 1;
+  const slots = displaySlotCount(w, inset > 0);
   const slotW = usableW / slots;
 
-  const makers = {
-    box: (cx) => {
-      const bw = Math.min(slotW * 0.82, 0.38) * R(0.75, 1);
-      const bd = Math.min(usableD * 0.85, 0.32) * R(0.8, 1);
-      const bh = Math.min(clear * 0.75, 0.28) * R(0.6, 1);
-      const kraft = mat(pick([0x8a6a45, 0x9a7850, 0x7d6040]));
-      const g = sub(cx, yTop, R(-0.02, 0.02), R(-0.12, 0.12));
-      put(g, new THREE.BoxGeometry(bw, bh, bd), kraft, 0, bh / 2, 0);
+  for (let k = 0; k < slots; k++) {
+    // every slot has its own random sequence, so changing one slot
+    // never reshuffles its neighbours
+    const g = new THREE.Group();
+    g.position.set(-usableW / 2 + slotW * (k + 0.5), yTop, 0);
+    const { rng, R, pick, mat, put } = displayKit(g, seed + k * 131);
+    const choice = (picks && picks[k]) || 'auto';
+    if (choice === 'none') continue;
+
+    let type = choice;
+    if (choice === 'auto') {
+      if (rng() < 0.12) continue; // leave a gap now and then
+      const options = [['box', 3], ['basket', 2], ['towels', 1.5], ['booksFlat', 1]];
+      if (clear >= 0.22) options.push(['jars', 2]);
+      if (clear >= 0.24) options.push(['ball', 0.7]);
+      if (clear >= 0.3) options.push(['booksUp', 2.5]);
+      if (clear >= 0.42) options.push(['plant', 1.5]);
+      if (clear >= 0.64 && slotW >= 0.44 && usableD >= 0.26) options.push(['suitcase', 2]);
+      let total = 0;
+      options.forEach((o) => (total += o[1]));
+      let t = rng() * total;
+      type = options[0][0];
+      for (const o of options) {
+        t -= o[1];
+        if (t <= 0) {
+          type = o[0];
+          break;
+        }
+      }
+    }
+    // c = the height the item is built for; shrink the whole item if the
+    // level is lower than that
+    const need = DISPLAY_NEED[type] || 0.08;
+    const c = Math.max(clear, need);
+    const scale = clear < need ? clear / need : 1;
+    if (scale < 0.55) continue; // far too tall for this level
+    g.scale.setScalar(scale);
+    const sw = slotW / scale,
+      sd = usableD / scale; // room available in the item's own units
+
+    if (type === 'box') {
+      const bw = Math.min(sw * 0.82, 0.38) * R(0.75, 1);
+      const bd = Math.min(sd * 0.85, 0.32) * R(0.8, 1);
+      const bh = Math.min(c * 0.75, 0.28) * R(0.6, 1);
+      g.rotation.y = R(-0.12, 0.12);
+      put(g, new THREE.BoxGeometry(bw, bh, bd), mat(pick([0x8a6a45, 0x9a7850, 0x7d6040])), 0, bh / 2, 0);
       put(g, new THREE.BoxGeometry(bw * 0.14, 0.002, bd * 1.001), mat(0xb7a07a), 0, bh + 0.001, 0);
-      if (clear > bh + 0.16 && rng() < 0.4) {
-        const sw = bw * R(0.6, 0.85),
-          sh = Math.min(0.12, clear - bh - 0.04) * R(0.7, 1),
-          sd = bd * R(0.6, 0.85);
-        const top = put(g, new THREE.BoxGeometry(sw, sh, sd), mat(pick([0x9a7850, 0xcfc8ba, 0x6f7c86])), R(-0.02, 0.02), bh + sh / 2, 0);
+      if (c > bh + 0.16 && rng() < 0.4) {
+        const tw = bw * R(0.6, 0.85),
+          th = Math.min(0.12, c - bh - 0.04) * R(0.7, 1),
+          td = bd * R(0.6, 0.85);
+        const top = put(g, new THREE.BoxGeometry(tw, th, td), mat(pick([0x9a7850, 0xcfc8ba, 0x6f7c86])), R(-0.02, 0.02), bh + th / 2, 0);
         top.rotation.y = R(-0.2, 0.2);
       }
-    },
-    basket: (cx) => {
-      const r = Math.min(Math.min(slotW, usableD) * 0.5 * R(0.72, 0.86), 0.17);
-      const h = Math.min(clear * 0.6, 0.2) * R(0.8, 1);
-      const g = sub(cx, yTop, R(-0.02, 0.02));
+    } else if (type === 'basket') {
+      const r = Math.min(Math.min(sw, sd) * 0.5 * R(0.72, 0.86), 0.17);
+      const h = Math.min(c * 0.6, 0.2) * R(0.8, 1);
       put(g, new THREE.CylinderGeometry(r, r * 0.82, h, 20), mat(pick([0x8f6f45, 0xa58555, 0x6d5335]), 0.95), 0, h / 2, 0);
       put(g, new THREE.CylinderGeometry(r * 0.9, r * 0.9, 0.004, 20), mat(0x3f3122), 0, h + 0.001, 0);
       const fill = mat(pick([0xb99a62, 0xa8553a, 0x8a9a4a]));
@@ -2013,92 +2085,87 @@ function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0) {
           rr = r * R(0.1, 0.55);
         put(g, new THREE.SphereGeometry(r * R(0.22, 0.3), 10, 8), fill, Math.cos(a) * rr, h + r * 0.06, Math.sin(a) * rr);
       }
-    },
-    booksUp: (cx) => {
-      const span = Math.min(slotW * 0.8, 0.3);
+    } else if (type === 'booksUp') {
+      const span = Math.min(sw * 0.8, 0.3);
       const tones = [0x394a63, 0x6b3a3a, 0x40584a, 0x8a7a55, 0x2c2c30, 0xb7b0a2, 0x7a5a6a];
-      let x = cx - span / 2;
-      while (x < cx + span / 2 - 0.02) {
+      let x = -span / 2;
+      while (x < span / 2 - 0.02) {
         const t = R(0.018, 0.04),
-          bh = Math.min(R(0.19, 0.26), clear - 0.03),
-          bd = Math.min(R(0.14, 0.19), usableD * 0.9);
-        put(group, new THREE.BoxGeometry(t, bh, bd), mat(pick(tones), 0.7), x + t / 2, yTop + bh / 2, 0);
+          bh = Math.min(R(0.19, 0.26), c - 0.03),
+          bd = Math.min(R(0.14, 0.19), sd * 0.9);
+        put(g, new THREE.BoxGeometry(t, bh, bd), mat(pick(tones), 0.7), x + t / 2, bh / 2, 0);
         x += t + 0.002;
       }
-    },
-    booksFlat: (cx) => {
+    } else if (type === 'booksFlat') {
       const tones = [0x394a63, 0x6b3a3a, 0x40584a, 0x8a7a55, 0xb7b0a2];
-      const n = Math.max(1, Math.min(4, Math.floor((clear - 0.02) / 0.032)));
-      const g = sub(cx, yTop, 0, R(-0.25, 0.25));
+      const n = Math.max(1, Math.min(4, Math.floor((c - 0.02) / 0.032)));
+      g.rotation.y = R(-0.25, 0.25);
       for (let i = 0; i < n; i++) {
-        const b = put(g, new THREE.BoxGeometry(Math.min(R(0.2, 0.26), slotW * 0.9), 0.03, Math.min(R(0.15, 0.19), usableD * 0.9)), mat(pick(tones), 0.7), 0, 0.015 + i * 0.031, 0);
-        b.rotation.y = R(-0.15, 0.15);
+        const book = put(g, new THREE.BoxGeometry(Math.min(R(0.2, 0.26), sw * 0.9), 0.03, Math.min(R(0.15, 0.19), sd * 0.9)), mat(pick(tones), 0.7), 0, 0.015 + i * 0.031, 0);
+        book.rotation.y = R(-0.15, 0.15);
       }
-    },
-    jars: (cx) => {
-      const n = Math.max(1, Math.min(3, Math.floor(slotW / 0.115)));
+    } else if (type === 'jars') {
+      const n = Math.max(1, Math.min(3, Math.floor(sw / 0.115)));
       const lid = mat(pick([0x2b2b2b, 0x8a6a45, 0xa9a9a9]), 0.5);
       for (let i = 0; i < n; i++) {
         const r = R(0.038, 0.05),
-          h = Math.min(R(0.12, 0.18), clear - 0.05);
-        const x = cx + (i - (n - 1) / 2) * 0.112;
+          h = Math.min(R(0.12, 0.18), c - 0.05);
+        const x = (i - (n - 1) / 2) * 0.112;
         const z = R(-0.03, 0.03);
-        put(group, new THREE.CylinderGeometry(r, r, h, 18), mat(pick([0xb9c7c2, 0xc2ad8c, 0x9fb3a5, 0xd0c9bb]), 0.25), x, yTop + h / 2, z);
-        put(group, new THREE.CylinderGeometry(r * 1.03, r * 1.03, 0.02, 18), lid, x, yTop + h + 0.01, z);
+        put(g, new THREE.CylinderGeometry(r, r, h, 18), mat(pick([0xb9c7c2, 0xc2ad8c, 0x9fb3a5, 0xd0c9bb]), 0.25), x, h / 2, z);
+        put(g, new THREE.CylinderGeometry(r * 1.03, r * 1.03, 0.02, 18), lid, x, h + 0.01, z);
       }
-    },
-    plant: (cx) => {
-      const g = sub(cx, yTop, R(-0.03, 0.03));
+    } else if (type === 'plant') {
       put(g, new THREE.CylinderGeometry(0.07, 0.055, 0.11, 18), mat(pick([0xa35d3d, 0xd3cec4, 0x3d3d3d])), 0, 0.055, 0);
       const greens = [0x3f6b3a, 0x4f7d45, 0x2f5a33];
-      const top = Math.min(0.3, clear - 0.08);
+      const top = Math.min(0.3, c - 0.08);
       for (let i = 0; i < 7; i++) {
         const a = rng() * Math.PI * 2,
           rr = R(0, 0.07);
         put(g, new THREE.IcosahedronGeometry(R(0.05, 0.08), 1), mat(pick(greens), 0.9), Math.cos(a) * rr, 0.13 + rng() * (top - 0.08), Math.sin(a) * rr);
       }
-    },
-    towels: (cx) => {
+    } else if (type === 'towels') {
       const tones = [0xdedad2, 0xb9c4b4, 0xd9b9b3, 0x8f9aa8];
-      const n = Math.max(1, Math.min(4, Math.floor((clear - 0.02) / 0.05)));
-      const g = sub(cx, yTop, 0, R(-0.08, 0.08));
+      const n = Math.max(1, Math.min(4, Math.floor((c - 0.02) / 0.05)));
+      g.rotation.y = R(-0.08, 0.08);
       for (let i = 0; i < n; i++)
-        put(g, new THREE.BoxGeometry(Math.min(slotW * 0.8, 0.3), 0.045, Math.min(usableD * 0.8, 0.2)), mat(pick(tones), 1), R(-0.008, 0.008), 0.0225 + i * 0.047, R(-0.008, 0.008));
-    },
-    suitcase: (cx) => {
-      const g = sub(cx, yTop, 0, R(-0.06, 0.06));
+        put(g, new THREE.BoxGeometry(Math.min(sw * 0.8, 0.3), 0.045, Math.min(sd * 0.8, 0.2)), mat(pick(tones), 1), R(-0.008, 0.008), 0.0225 + i * 0.047, R(-0.008, 0.008));
+    } else if (type === 'ball') {
+      // size-5 football: white ball with the twelve black pentagons,
+      // one at each corner of an icosahedron
+      const r = 0.11;
+      const ball = new THREE.Group();
+      ball.position.set(R(-0.02, 0.02), r, R(-0.02, 0.02));
+      ball.rotation.set(R(0, 3), R(0, 3), R(0, 3));
+      g.add(ball);
+      put(ball, new THREE.SphereGeometry(r, 28, 20), mat(0xb9b9b6, 0.45), 0, 0, 0);
+      const patch = mat(0x141414, 0.5);
+      const corners = new THREE.IcosahedronGeometry(1, 0).attributes.position;
+      const seen = [];
+      for (let i = 0; i < corners.count; i++) {
+        const v = new THREE.Vector3().fromBufferAttribute(corners, i).normalize();
+        if (seen.some((q) => q.distanceTo(v) < 0.01)) continue;
+        seen.push(v);
+        // a five-sided cap of a slightly larger sphere: large enough that
+        // its straight edges stay outside the ball and read as a pentagon
+        const pent = put(ball, new THREE.SphereGeometry(r * 1.035, 5, 3, 0, Math.PI * 2, 0, 0.37), patch, 0, 0, 0);
+        pent.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v);
+        pent.castShadow = false;
+      }
+    } else if (type === 'suitcase') {
+      g.rotation.y = R(-0.06, 0.06);
       const shell = mat(pick([0x1f3d36, 0x2b2f3a, 0x55585c]), 0.5);
-      put(g, new THREE.BoxGeometry(0.4, 0.56, 0.24), shell, 0, 0.31, 0);
+      put(g, new THREE.BoxGeometry(Math.min(0.4, sw * 0.95), 0.56, Math.min(0.24, sd * 0.95)), shell, 0, 0.31, 0);
       put(g, new THREE.BoxGeometry(0.14, 0.025, 0.02), mat(0x1a1a1a), 0, 0.605, 0);
       [-0.15, 0.15].forEach((x) =>
         [-0.08, 0.08].forEach((z) =>
           put(g, new THREE.CylinderGeometry(0.016, 0.016, 0.03, 10), mat(0x111111), x, 0.015, z)
         )
       );
-    },
-  };
-
-  for (let k = 0; k < slots; k++) {
-    const roll = rng(); // drawn every time so later slots stay stable
-    if (roll < 0.12) continue; // leave a gap now and then
-    const cx = -usableW / 2 + slotW * (k + 0.5);
-    const options = [['box', 3], ['basket', 2], ['towels', 1.5], ['booksFlat', 1]];
-    if (clear >= 0.22) options.push(['jars', 2]);
-    if (clear >= 0.3) options.push(['booksUp', 2.5]);
-    if (clear >= 0.42) options.push(['plant', 1.5]);
-    if (clear >= 0.64 && slotW >= 0.44 && usableD >= 0.26) options.push(['suitcase', 2]);
-    let total = 0;
-    options.forEach((o) => (total += o[1]));
-    let t = rng() * total;
-    let chosen = options[0][0];
-    for (const o of options) {
-      t -= o[1];
-      if (t <= 0) {
-        chosen = o[0];
-        break;
-      }
+    } else {
+      continue;
     }
-    makers[chosen](cx);
+    group.add(g);
   }
 }
 
@@ -3519,7 +3586,7 @@ export default function BoothSimulator() {
         Array.isArray(p.levels)
           ? p.levels.map((l) => `${l.h}${l.style}`).join('.')
           : ''
-      }-${p.showItems ? 'items' : ''}`;
+      }-${p.showItems ? `items${JSON.stringify(p.itemPicks || '')}` : ''}`;
       if (!mesh || mesh.userData.fingerprint !== fingerprint) {
         if (mesh) {
           group.remove(mesh);
@@ -4871,23 +4938,7 @@ function PropertyPanel({
       </Section>
 
       {tpl.brand === 'HOMEDANT HOUSE' && HH_ITEM_TYPES.includes(tpl.type) && (
-        <Section title={tr('Display items')}>
-          <div className="flex gap-1.5">
-            {[false, true].map((on) => (
-              <button
-                key={String(on)}
-                onClick={() => update({ showItems: on })}
-                className={`flex-1 text-xs py-1.5 rounded border transition ${
-                  !!product.showItems === on
-                    ? 'border-gray-900 bg-gray-900 text-white'
-                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                {tr(on ? 'on' : 'off')}
-              </button>
-            ))}
-          </div>
-        </Section>
+        <HHItemEditor product={product} tpl={tpl} update={update} />
       )}
 
       {tpl.brand === 'HOMEDANT HOUSE' && HH_LEVEL_TYPES.includes(tpl.type) && (
@@ -5068,6 +5119,86 @@ function IconBtn({ children, onClick, title }) {
     >
       {children}
     </button>
+  );
+}
+
+/* Display items for a HOMEDANT HOUSE shelf: switch them on or off, and
+   when on, choose what sits in each slot of each level. "Auto" lets the
+   simulator pick; "None" leaves the slot empty. Top level listed first. */
+function HHItemEditor({ product, tpl, update }) {
+  const tiers = product.tier || tpl.defaultTier;
+  const levels = hhResolveLevels(product, tiers);
+  const first = tpl.type === 'open_base' ? 1 : 0;
+  const picks = product.itemPicks || {};
+  const setPick = (i, k, value, slots) => {
+    const row = Array.from({ length: slots }, (_, n) => (picks[i] && picks[i][n]) || 'auto');
+    row[k] = value;
+    update({ itemPicks: { ...picks, [i]: row } });
+  };
+  const rows = [];
+  if (product.showItems) {
+    for (let i = levels.length - 1; i >= first; i--) {
+      const slots = displaySlotCount(product.width * MM_TO_M, levels[i].style === 'basket');
+      rows.push(
+        <div key={i} className="flex items-center gap-1.5 mb-1.5">
+          <span className="flex-none w-4 text-xs text-gray-500">{i + 1}</span>
+          {Array.from({ length: slots }, (_, k) => (
+            <select
+              key={k}
+              value={(picks[i] && picks[i][k]) || 'auto'}
+              onChange={(e) => setPick(i, k, e.target.value, slots)}
+              className="flex-1 min-w-0 text-xs border border-gray-300 rounded px-1 py-1 bg-white"
+            >
+              <option value="auto">{tr('Auto')}</option>
+              <option value="none">{tr('None')}</option>
+              {DISPLAY_ITEMS.map(([key, label]) => (
+                <option key={key} value={key}>
+                  {tr(label)}
+                </option>
+              ))}
+            </select>
+          ))}
+        </div>
+      );
+    }
+  }
+  return (
+    <Section title={tr('Display items')}>
+      <div className="flex gap-1.5">
+        {[false, true].map((on) => (
+          <button
+            key={String(on)}
+            onClick={() => update({ showItems: on })}
+            className={`flex-1 text-xs py-1.5 rounded border transition ${
+              !!product.showItems === on
+                ? 'border-gray-900 bg-gray-900 text-white'
+                : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {tr(on ? 'on' : 'off')}
+          </button>
+        ))}
+      </div>
+      {product.showItems && (
+        <div className="mt-3">
+          <div className="text-xs text-gray-500 mb-2">
+            {tr('Choose an item for each spot, left to right. Level 1 is the lowest.')}
+          </div>
+          {rows}
+          <button
+            onClick={() => update({ itemPicks: undefined })}
+            disabled={!product.itemPicks}
+            className={`w-full text-xs py-1.5 rounded border transition ${
+              product.itemPicks
+                ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                : 'border-gray-200 bg-gray-50 text-gray-400'
+            }`}
+          >
+            {tr('Reset to auto')}
+          </button>
+        </div>
+      )}
+    </Section>
   );
 }
 
