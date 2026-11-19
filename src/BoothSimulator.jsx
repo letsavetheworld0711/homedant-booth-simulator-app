@@ -186,7 +186,7 @@ const PRODUCT_LIBRARY = [
     type: 'garment',
     defaultSize: { width: 900, depth: 500, height: 1800 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
-    tierOptions: [1, 2],
+    tierOptions: [1, 2, 3],
     defaultTier: 2,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -216,7 +216,8 @@ const PRODUCT_LIBRARY = [
     type: 'open_base',
     defaultSize: { width: 900, depth: 400, height: 1800 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
-    tierOptions: [3, 4],
+    // counts the open space as a level: 2 = one board, 4 = three boards
+    tierOptions: [2, 3, 4],
     defaultTier: 4,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -229,10 +230,10 @@ const PRODUCT_LIBRARY = [
     category: 'Drawer Shelf',
     name: 'House Drawer Shelf',
     type: 'drawer',
-    defaultSize: { width: 600, depth: 400, height: 1200 },
+    defaultSize: { width: 800, depth: 500, height: 2100 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
-    tierOptions: [3],
-    defaultTier: 3,
+    tierOptions: [2],
+    defaultTier: 2,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
     addOns: ['drawer'],
@@ -274,9 +275,9 @@ const PRODUCT_LIBRARY = [
     category: 'Pegboard Shelf',
     name: 'House Pegboard Shelf',
     type: 'pegboard',
-    defaultSize: { width: 600, depth: 400, height: 1800 },
+    defaultSize: { width: 600, depth: 300, height: 900 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
-    tierOptions: [3, 4, 5],
+    tierOptions: [3, 4],
     defaultTier: 4,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -1095,7 +1096,10 @@ const KO = {
   "Snack boxes": "과자 박스",
   "Floor": "바닥",
   "Washing machine": "세탁기",
-  "The washing machine does not fit. Use a width of 700 or more and raise level 2.": "세탁기가 들어가지 않습니다. 폭을 700 이상으로 하고 2단을 올려주세요.",
+  "The washing machine does not fit. Use a width of 700 or more and raise the lowest level.": "세탁기가 들어가지 않습니다. 폭을 700 이상으로 하고 가장 아래 단을 올려주세요.",
+  "Laptop": "노트북",
+  "TV": "TV",
+  "Hanger bars": "행거봉 수",
   "Choose an item for each spot, left to right. Level 1 is the lowest.": "칸마다 놓을 물건을 고르세요. 왼쪽부터 순서대로이고, 1번이 가장 아랫단입니다.",
   "Reset to auto": "자동으로 되돌리기",
   "off": "끔",
@@ -1331,9 +1335,10 @@ const LIBRARY_BRANDS = ['HOMEDANT HOUSE', 'Exhibition'];
    were made for; when either changes the levels fall back to an even
    spread. Beams hook into the post slots, so heights move in slot-pitch
    steps.                                                               */
-const HH_LEVEL_TYPES = ['shelf', 'open_base', 'garment', 'rolling'];
+const HH_LEVEL_TYPES = ['shelf', 'open_base', 'garment', 'rolling', 'pegboard'];
 // products that can be dressed with display items
-const HH_ITEM_TYPES = ['shelf', 'open_base', 'garment', 'rolling', 'pegboard'];
+const HH_ITEM_TYPES = ['shelf', 'open_base', 'garment', 'rolling', 'pegboard', 'drawer'];
+const HH_DRAWER_TOP = 515; // board over the two drawers of the drawer hanger
 const HH_LEVEL_MIN = 112; // lowest level: 50 gap + 53 beam + 9 board
 const HH_LEVEL_STEP = 33; // slot pitch
 const HH_LEVEL_GAP = 99; // minimum distance between two levels
@@ -1342,6 +1347,18 @@ function hhLevelKey(p) {
 }
 function hhDefaultLevels(p, tiers) {
   const n = tiers || p.tier || 1;
+  // drawer hanger: one board over the drawers, one at the top
+  if (p.productId === 'hh_drawer')
+    return [
+      { h: Math.min(HH_DRAWER_TOP, p.height - HH_LEVEL_GAP), style: 'basic' },
+      { h: p.height, style: 'basic' },
+    ];
+  // perforated trolley: trays below, a flat top
+  if (p.productId === 'hh_pegboard' && !p.shelfStyle)
+    return Array.from({ length: n }, (_, i) => ({
+      h: n === 1 ? p.height : Math.round(HH_LEVEL_MIN + (i / (n - 1)) * (p.height - HH_LEVEL_MIN)),
+      style: i === n - 1 ? 'basic' : 'basket',
+    }));
   const style = p.shelfStyle === 'basket' ? 'basket' : 'basic';
   return Array.from({ length: n }, (_, i) => ({
     h:
@@ -1916,7 +1933,7 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
         clear = nextBeamBottom - top - 0.015;
       }
       // under a hanger bar the clothes need most of the height
-      if (hh.garment && i === tiers - 2) clear *= 0.3;
+      if (hh.barLevels && hh.barLevels.includes(i + 1)) clear *= 0.3;
       addDisplayItems(
         group,
         w,
@@ -2103,6 +2120,8 @@ const DISPLAY_ITEMS = [
   ['fruit', 'Fruit bowl', 0.2],
   ['cans', 'Canned food', 0.14],
   ['snacks', 'Snack boxes', 0.28],
+  ['laptop', 'Laptop', 0.25],
+  ['tv', 'TV', 0.4],
 ];
 
 /* Printed faces for the cans and snack boxes: made-up generic packaging,
@@ -2118,6 +2137,25 @@ function labelTexture(key, w, h, draw) {
   t.anisotropy = 4;
   _labelTex[key] = t;
   return t;
+}
+/* what a TV or laptop shows: a calm blue-grey picture, lit from within */
+function screenTexture() {
+  return labelTexture('screen', 256, 144, (x, w, h) => {
+    const g = x.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, '#2b4a63');
+    g.addColorStop(0.55, '#5f8296');
+    g.addColorStop(1, '#c9b79a');
+    x.fillStyle = g;
+    x.fillRect(0, 0, w, h);
+    x.fillStyle = 'rgba(20,34,46,0.55)';
+    x.beginPath();
+    x.moveTo(0, h);
+    x.lineTo(0, h * 0.7);
+    x.quadraticCurveTo(w * 0.3, h * 0.45, w * 0.55, h * 0.72);
+    x.quadraticCurveTo(w * 0.8, h * 0.92, w, h * 0.66);
+    x.lineTo(w, h);
+    x.fill();
+  });
 }
 // name, label colour, band colour, picture colour
 const CAN_KINDS = [
@@ -2261,6 +2299,28 @@ function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0, picks = null
   if (clear < 0.08 || usableW < 0.15 || usableD < 0.15) return;
   const slots = displaySlotCount(w, inset > 0);
   const slotW = usableW / slots;
+
+  // a TV takes the whole level, whichever spot it was picked for
+  if (picks && picks.slice(0, slots).includes('tv')) {
+    const g = new THREE.Group();
+    g.position.set(0, yTop, 0);
+    const { mat, put } = displayKit(g, seed);
+    const tw = Math.min(usableW * 0.95, 1.25, ((clear - 0.07) * 16) / 9);
+    if (tw < 0.3) return;
+    const sh = (tw * 9) / 16;
+    const body = mat(0x0b0b0d, 0.4);
+    put(g, new THREE.BoxGeometry(tw * 0.34, 0.01, Math.min(0.2, usableD * 0.9)), body, 0, 0.005, 0);
+    put(g, new THREE.BoxGeometry(0.05, 0.05, 0.022), body, 0, 0.03, -0.01);
+    put(g, new THREE.BoxGeometry(tw, sh, 0.028), body, 0, 0.05 + sh / 2, 0);
+    const screen = new THREE.Mesh(
+      new THREE.PlaneGeometry(tw - 0.016, sh - 0.016),
+      new THREE.MeshBasicMaterial({ map: screenTexture() })
+    );
+    screen.position.set(0, 0.05 + sh / 2, 0.0145);
+    g.add(screen);
+    group.add(g);
+    return;
+  }
 
   for (let k = 0; k < slots; k++) {
     // every slot has its own random sequence, so changing one slot
@@ -2545,6 +2605,28 @@ function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0, picks = null
         const a = (i / 5) * Math.PI * 2 + R(0, 1);
         put(g, new THREE.SphereGeometry(r * 0.3, 14, 10), mat(tones[i], 0.6), Math.cos(a) * r * 0.45, 0.09, Math.sin(a) * r * 0.45);
       }
+    } else if (type === 'laptop') {
+      // open notebook: base, keyboard, and the lid leaning back
+      const lw = 0.32,
+        ld = 0.22;
+      const fit = Math.min(1, (sw * 0.92) / lw, (sd * 0.95) / (ld + 0.03));
+      g.scale.setScalar(scale * fit);
+      g.rotation.y = R(-0.12, 0.12);
+      const shell = mat(0x8d9094, 0.4);
+      put(g, new THREE.BoxGeometry(lw, 0.014, ld), shell, 0, 0.007, 0);
+      put(g, new THREE.BoxGeometry(lw * 0.88, 0.001, ld * 0.46), mat(0x1b1c1f, 0.6), 0, 0.0146, -ld * 0.16);
+      put(g, new THREE.BoxGeometry(lw * 0.3, 0.001, ld * 0.26), mat(0x7b7e82, 0.3), 0, 0.0146, ld * 0.3);
+      const lid = new THREE.Group();
+      lid.position.set(0, 0.014, -ld / 2);
+      lid.rotation.x = -0.3;
+      g.add(lid);
+      put(lid, new THREE.BoxGeometry(lw, ld, 0.006), shell, 0, ld / 2, -0.003);
+      const scr = new THREE.Mesh(
+        new THREE.PlaneGeometry(lw - 0.02, ld - 0.022),
+        new THREE.MeshBasicMaterial({ map: screenTexture() })
+      );
+      scr.position.set(0, ld / 2, 0.0005);
+      lid.add(scr);
     } else if (type === 'suitcase') {
       g.rotation.y = R(-0.06, 0.06);
       const shell = mat(pick([0x1f3d36, 0x2b2f3a, 0x55585c]), 0.5);
@@ -2590,11 +2672,11 @@ function addHangingClothes(group, w, d, rodY, maxLen, seed) {
 /* HOMEDANT HOUSE hanger bar: a bright steel tube running the width of
    the shelf, held by a round cup on the inside of each SIDE beam of the
    top level, low on the beam so the cup hangs just below its edge.     */
-function addHHHangerBar(group, w, d, frameMat, tiers) {
+function addHHHangerBar(group, w, d, frameMat, tiers, li = tiers - 1) {
   const { postT: T, sheet: t, beamH: BH } = HH;
   const hh = frameMat.userData.hh;
   const lv = hhResolveLevels(hh.product, tiers);
-  const top = lv[lv.length - 1];
+  const top = lv[li];
   const beamTop = top.h * MM_TO_M - (top.style === 'basket' ? 0 : 0.009);
   const y = beamTop - BH + 0.005;
   const len = w - 2 * (T + t);
@@ -2608,14 +2690,14 @@ function addHHHangerBar(group, w, d, frameMat, tiers) {
   rodGeo.rotateZ(Math.PI / 2);
   hhAdd(group, rodGeo, steel, 0, y, 0);
   if (hh.product.showItems) {
-    const below = lv.length > 1 ? lv[lv.length - 2].h * MM_TO_M : 0;
+    const below = li > 0 ? lv[li - 1].h * MM_TO_M : 0;
     addHangingClothes(
       group,
       w,
       d,
       y,
-      Math.min(1.05, (y - below) * 0.62),
-      hashSeed(hh.product.instanceId || 'item') + 31
+      Math.min(1.05, (y - below) * (li > 0 ? 0.62 : 0.8)),
+      hashSeed(hh.product.instanceId || 'item') + 31 + (tiers - 1 - li) * 57
     );
   }
   const cupGeo = new THREE.CylinderGeometry(0.019, 0.019, 0.014, 20);
@@ -2720,6 +2802,10 @@ function addHHCasters(group, inner, w, d) {
   });
 }
 
+function hhHangerCount(p, tiers) {
+  if (tiers < 3) return 1;
+  return p.hangers === 1 ? 1 : 2;
+}
 function buildGarmentRack(group, p, tpl) {
   const w = p.width * MM_TO_M,
     d = p.depth * MM_TO_M,
@@ -2730,13 +2816,17 @@ function buildGarmentRack(group, p, tpl) {
     house: tpl.brand === 'HOMEDANT HOUSE',
   });
   addPosts(group, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
-  if (mats.frame.userData.hh) mats.frame.userData.hh.garment = true;
-  // tier boards (1-2 typically)
-  addTierBoards(group, w, d, h, p.tier || tpl.defaultTier, mats.board, {
+  const gTiers = p.tier || tpl.defaultTier;
+  // one bar under the top level; with three levels a second bar can hang
+  // under the middle one
+  const bars = [gTiers - 1];
+  if (gTiers >= 3 && hhHangerCount(p, gTiers) === 2) bars.push(gTiers - 2);
+  if (mats.frame.userData.hh) mats.frame.userData.hh.barLevels = bars;
+  addTierBoards(group, w, d, h, gTiers, mats.board, {
     frameMat: mats.frame,
   });
   if (mats.frame.userData.hh) {
-    addHHHangerBar(group, w, d, mats.frame, p.tier || tpl.defaultTier);
+    bars.forEach((li) => addHHHangerBar(group, w, d, mats.frame, gTiers, li));
   } else {
     // hanger bar — sits just below the top board so clothes hang from the
     // top of the rack like a real garment rack (was floating mid-height).
@@ -2888,7 +2978,105 @@ function makePegboardTexture(isBlack) {
   return tex;
 }
 
+/* Perforated beam: a tall plate (180 mm) with five rows of round holes at
+   a 25 mm pitch, used in place of an ordinary beam.                    */
+const HH_PERF_H = 0.18;
+function hhPerfMaterial(len, height, hex) {
+  const cols = Math.floor((len - 0.09) / 0.025) + 1;
+  const tex = labelTexture(`perf${Math.round(len * 1000)}x${Math.round(height * 1000)}`, Math.min(2048, Math.round(len * 2400)), Math.round(height * 2400), (x, cw, ch) => {
+    x.fillStyle = '#ffffff';
+    x.fillRect(0, 0, cw, ch);
+    x.globalCompositeOperation = 'destination-out';
+    const px = cw / len;
+    for (let r = 0; r < 5; r++)
+      for (let c = 0; c < cols; c++) {
+        x.beginPath();
+        x.arc(cw / 2 + (c - (cols - 1) / 2) * 0.025 * px, (0.027 + r * 0.025) * (ch / height), 0.0032 * px, 0, Math.PI * 2);
+        x.fill();
+      }
+  });
+  tex.anisotropy = 8;
+  return new THREE.MeshStandardMaterial({
+    color: hex,
+    map: tex,
+    alphaTest: 0.5,
+    side: THREE.DoubleSide,
+    roughness: 0.6,
+    metalness: 0,
+  });
+}
+/* HOMEDANT HOUSE perforated trolley (from the product CAD, 300/400 x 600
+   x 900): four posts on casters, tray levels with a flat top, perforated
+   beams around three sides of the level below the top, and a push
+   handle at one end.                                                   */
+function buildHHTrolley(group, p, tpl) {
+  const w = p.width * MM_TO_M,
+    d = p.depth * MM_TO_M,
+    h = p.height * MM_TO_M;
+  const { flange: F, postT: T, sheet: t, beamH: BH } = HH;
+  const mats = makeMaterials(p, { house: true });
+  const tiers = p.tier || tpl.defaultTier;
+  const inner = new THREE.Group();
+  inner.position.y = HH_CASTER_H;
+  addPosts(inner, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
+  addTierBoards(inner, w, d, h, tiers, mats.board, { frameMat: mats.frame });
+  group.add(inner);
+  addHHCasters(group, inner, w, d);
+
+  // perforated beams: back and both ends of the level under the top
+  const lv = hhResolveLevels(p, tiers);
+  if (tiers >= 2) {
+    const L = lv[tiers - 2];
+    const beamTop = L.h * MM_TO_M - (L.style === 'basket' ? 0 : 0.009);
+    const y0 = beamTop - BH;
+    const N = lv[tiers - 1];
+    const room = N.h * MM_TO_M - BH - 0.009 - 0.02 - y0;
+    const ph = Math.min(HH_PERF_H, room);
+    if (ph >= 0.16) {
+      const lenX = w - 2 * T,
+        lenZ = d - 2 * T - 2 * t;
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(lenX, ph), hhPerfMaterial(lenX, ph, mats.frameHex));
+      back.position.set(0, y0 + ph / 2, -(d / 2 - T + 0.0004));
+      back.castShadow = true;
+      inner.add(back);
+      [-1, 1].forEach((sx) => {
+        const end = new THREE.Mesh(new THREE.PlaneGeometry(lenZ, ph), hhPerfMaterial(lenZ, ph, mats.frameHex));
+        end.rotation.y = Math.PI / 2;
+        end.position.set(sx * (w / 2 - T + 0.0004), y0 + ph / 2, 0);
+        end.castShadow = true;
+        inner.add(end);
+      });
+    }
+  }
+
+  // push handle: a moulded bracket over each post top at one end, and a
+  // tube between them
+  const prof = new THREE.Shape();
+  prof.moveTo(-F - 0.002, 0);
+  prof.lineTo(-F - 0.002, 0.008);
+  prof.lineTo(0, 0.008);
+  prof.quadraticCurveTo(0.03, 0.012, 0.046, 0.038);
+  prof.absarc(0.046, 0.017, 0.021, Math.PI / 2, -Math.PI / 2, true);
+  prof.quadraticCurveTo(0.02, -0.02, 0.0015, -0.07);
+  prof.lineTo(0.0015, 0);
+  const bracketGeo = new THREE.ExtrudeGeometry(prof, { depth: 0.05, bevelEnabled: false, curveSegments: 14 });
+  bracketGeo.translate(0, 0, -0.025);
+  const plastic = new THREE.MeshStandardMaterial({ color: mats.frameHex, roughness: 0.6, metalness: 0 });
+  [-1, 1].forEach((sz) => hhAdd(inner, bracketGeo, plastic, w / 2, h, sz * (d / 2 - F / 2)));
+  const tube = new THREE.CylinderGeometry(0.0125, 0.0125, d - F, 20);
+  tube.rotateX(Math.PI / 2);
+  hhAdd(
+    inner,
+    tube,
+    new THREE.MeshStandardMaterial({ color: 0xe8ebee, metalness: 0.15, roughness: 0.25, emissive: 0x2e2e2e }),
+    w / 2 + 0.046,
+    h + 0.017,
+    0
+  );
+}
+
 function buildPegboard(group, p, tpl) {
+  if (tpl.brand === 'HOMEDANT HOUSE') return buildHHTrolley(group, p, tpl);
   const w = p.width * MM_TO_M,
     d = p.depth * MM_TO_M,
     h = p.height * MM_TO_M;
@@ -2940,7 +3128,68 @@ function buildPegboard(group, p, tpl) {
   addPostFeet(group, w, d, mats.foot, 0.025);
 }
 
+/* HOMEDANT HOUSE drawer hanger (from the product CAD, 800 x 500 x 2100):
+   two steel drawers at the bottom with a board over them, open hanging
+   space above, and a top board with the hanger bar under it.           */
+function buildHHDrawerHanger(group, p, tpl) {
+  const w = p.width * MM_TO_M,
+    d = p.depth * MM_TO_M,
+    h = p.height * MM_TO_M;
+  const { flange: F, postT: T, sheet: t, beamH: BH } = HH;
+  const mats = makeMaterials(p, { house: true });
+  const hh = mats.frame.userData.hh;
+  hh.barLevels = [1];
+  addPosts(group, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
+  addTierBoards(group, w, d, h, 2, mats.board, { frameMat: mats.frame });
+  addHHHangerBar(group, w, d, mats.frame, 2, 1);
+
+  // beams with no board: front and back at the floor, and the side
+  // beams that carry the drawer rails
+  const plateX = new THREE.BoxGeometry(w - 2 * T, BH, t);
+  const plateZ = new THREE.BoxGeometry(t, BH, d - 2 * T - 2 * t);
+  [-1, 1].forEach((s) => {
+    hhAdd(group, plateX, mats.frame, 0, 0.03 + BH / 2, s * (d / 2 - T - t / 2));
+    [0.09, 0.27].forEach((y) => hhAdd(group, plateZ, mats.frame, s * (w / 2 - T - t / 2), y + BH / 2, 0));
+  });
+
+  // drawers: painted steel like the frame, a bar handle on each front
+  const paint = new THREE.MeshStandardMaterial({
+    color: mats.frameHex,
+    metalness: mats.frame.metalness,
+    roughness: mats.frame.roughness,
+  });
+  const fw = w - 0.082,
+    fh = 0.175,
+    zf = d / 2 - 0.006; // front face
+  const front = new THREE.BoxGeometry(fw, fh, 0.016);
+  const box = new THREE.BoxGeometry(fw - 0.016, 0.16, d - 0.03);
+  const bar = new THREE.CylinderGeometry(0.005, 0.005, 0.139, 12);
+  bar.rotateZ(Math.PI / 2);
+  const post = new THREE.CylinderGeometry(0.004, 0.004, 0.02, 10);
+  post.rotateX(Math.PI / 2);
+  [0.093, 0.273].forEach((y0) => {
+    hhAdd(group, front, paint, 0, y0 + fh / 2, zf - 0.008);
+    hhAdd(group, box, paint, 0, y0 + 0.006 + 0.08, zf - 0.016 - (d - 0.03) / 2);
+    hhAdd(group, bar, paint, 0, y0 + fh / 2, zf + 0.02);
+    [-0.06, 0.06].forEach((x) => hhAdd(group, post, paint, x, y0 + fh / 2, zf + 0.01));
+  });
+
+  // 2100 posts are two 1050 lengths joined by a sleeve at mid height
+  if (p.height === 2100) {
+    const sx = new THREE.BoxGeometry(F + 0.003, 0.134, 0.0015);
+    const sz = new THREE.BoxGeometry(0.0015, 0.134, F + 0.003);
+    [-1, 1].forEach((a) =>
+      [-1, 1].forEach((b) => {
+        hhAdd(group, sx, mats.frame, a * (w / 2 - F / 2), 1.049, b * (d / 2 + 0.0008));
+        hhAdd(group, sz, mats.frame, a * (w / 2 + 0.0008), 1.049, b * (d / 2 - F / 2));
+      })
+    );
+  }
+  addPostFeet(group, w, d, mats.foot, 0.025);
+}
+
 function buildDrawer(group, p, tpl) {
+  if (tpl.brand === 'HOMEDANT HOUSE') return buildHHDrawerHanger(group, p, tpl);
   const w = p.width * MM_TO_M,
     d = p.depth * MM_TO_M,
     h = p.height * MM_TO_M;
@@ -3991,7 +4240,7 @@ export default function BoothSimulator() {
         Array.isArray(p.levels)
           ? p.levels.map((l) => `${l.h}${l.style}`).join('.')
           : ''
-      }-${
+      }-${p.hangers || ''}-${
         p.showItems
           ? `items${propsReady ? 'R' : ''}${JSON.stringify(p.itemPicks || '')}${p.baseItem || ''}`
           : ''
@@ -5220,11 +5469,30 @@ function PropertyPanel({
             >
               {tpl.tierOptions.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {tpl.type === 'open_base' ? t - 1 : t}
                   {tr('-Tier')}
                 </option>
               ))}
             </select>
+          </Field>
+        )}
+        {tpl.brand === 'HOMEDANT HOUSE' && tpl.type === 'garment' && product.tier >= 3 && (
+          <Field label={tr('Hanger bars')}>
+            <div className="flex gap-1.5">
+              {[1, 2].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => update({ hangers: n })}
+                  className={`flex-1 text-xs py-1.5 rounded border transition ${
+                    hhHangerCount(product, product.tier) === n
+                      ? 'border-gray-900 bg-gray-900 text-white'
+                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
           </Field>
         )}
       </Section>
@@ -5482,7 +5750,7 @@ function IconBtn({ children, onClick, title }) {
    when on, choose what sits in each slot of each level. "Auto" lets the
    simulator pick; "None" leaves the slot empty. Top level listed first. */
 function HHItemEditor({ product, tpl, update }) {
-  const tiers = product.tier || tpl.defaultTier;
+  const tiers = tpl.type === 'drawer' ? 2 : product.tier || tpl.defaultTier;
   const levels = hhResolveLevels(product, tiers);
   const first = tpl.type === 'open_base' ? 1 : 0;
   const picks = product.itemPicks || {};
@@ -5523,7 +5791,7 @@ function HHItemEditor({ product, tpl, update }) {
       const slots = displaySlotCount(product.width * MM_TO_M, levels[i].style === 'basket');
       rows.push(
         <div key={i} className="flex items-center gap-1.5 mb-1.5">
-          <span className="flex-none w-4 text-xs text-gray-500">{i + 1}</span>
+          <span className="flex-none w-4 text-xs text-gray-500">{i + 1 - first}</span>
           {Array.from({ length: slots }, (_, k) => (
             <select
               key={k}
@@ -5582,7 +5850,7 @@ function HHItemEditor({ product, tpl, update }) {
           )}
           {washerOut && (
             <div className="text-xs text-amber-700 mb-1.5">
-              {tr('The washing machine does not fit. Use a width of 700 or more and raise level 2.')}
+              {tr('The washing machine does not fit. Use a width of 700 or more and raise the lowest level.')}
             </div>
           )}
           <button
@@ -5637,7 +5905,7 @@ function HHLevelEditor({ product, tpl, update }) {
       i === levels.length - 1 ? product.height : levels[i + 1].h - HH_LEVEL_GAP;
     rows.push(
       <div key={i} className="flex items-center gap-2 mb-2">
-        <span className="flex-none w-4 text-xs text-gray-500">{i + 1}</span>
+        <span className="flex-none w-4 text-xs text-gray-500">{i + 1 - first}</span>
         <input
           type="range"
           min={min}
