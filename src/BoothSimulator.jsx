@@ -922,6 +922,49 @@ function makeSlotPostTexture(baseHex) {
   return tex;
 }
 
+/* Brands shown as tabs in the product library. SPEEDRACK is hidden for
+   now: put 'SPEEDRACK' back at the front of this list to show it again.
+   Its products and builders are untouched, so saved layouts that already
+   contain SPEEDRACK items still load and render.                       */
+const LIBRARY_BRANDS = ['HOMEDANT HOUSE', 'Exhibition'];
+
+/* ----- HOMEDANT HOUSE shelf levels -----
+   Each level has its own height and its own style. `h` is in mm from the
+   bottom of the posts to the top of the level: the board top in basic
+   style, the rim top in basket style. Levels are stored on the product
+   as `levels`, with `levelsKey` recording the tier count and height they
+   were made for; when either changes the levels fall back to an even
+   spread. Beams hook into the post slots, so heights move in slot-pitch
+   steps.                                                               */
+const HH_LEVEL_TYPES = ['shelf', 'open_base', 'garment', 'rolling'];
+const HH_LEVEL_MIN = 112; // lowest level: 50 gap + 53 beam + 9 board
+const HH_LEVEL_STEP = 33; // slot pitch
+const HH_LEVEL_GAP = 99; // minimum distance between two levels
+function hhLevelKey(p) {
+  return `${p.tier}-${p.height}`;
+}
+function hhDefaultLevels(p, tiers) {
+  const n = tiers || p.tier || 1;
+  const style = p.shelfStyle === 'basket' ? 'basket' : 'basic';
+  return Array.from({ length: n }, (_, i) => ({
+    h:
+      n === 1
+        ? p.height
+        : Math.round(HH_LEVEL_MIN + (i / (n - 1)) * (p.height - HH_LEVEL_MIN)),
+    style,
+  }));
+}
+function hhResolveLevels(p, tiers) {
+  const n = tiers || p.tier || 1;
+  if (
+    Array.isArray(p.levels) &&
+    p.levels.length === n &&
+    p.levelsKey === hhLevelKey(p)
+  )
+    return p.levels;
+  return hhDefaultLevels(p, n);
+}
+
 /* ===== HOMEDANT HOUSE frame =====
    Real construction (from the product renders):
    - Post: an L-angle whose two flanges are each folded back on themselves
@@ -1083,9 +1126,9 @@ function addHHFeet(group, w, d, footMat) {
 /* One shelf level. `yBoard` is where the board centre sits in the basic
    style; the basket style keeps the level at the same height but flips
    the beams, so the rim top lands where the board top was.            */
-function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness) {
+function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style) {
   const { flange: F, postT: T, sheet: t, beamH: BH, lip: LIP } = HH;
-  const basket = frameMat.userData.hh.style === 'basket';
+  const basket = (style || frameMat.userData.hh.style) === 'basket';
   const beamTop = basket ? yBoard + thickness / 2 : yBoard - thickness / 2;
   const beamMid = beamTop - BH / 2;
   const lipY = basket ? beamTop - BH + t / 2 : beamTop - t / 2;
@@ -1243,7 +1286,11 @@ function makeMaterials(p, opts = {}) {
       metalness: frame.metalness,
       roughness: frame.roughness,
     });
-    const hhInfo = { style: p.shelfStyle === 'basket' ? 'basket' : 'basic', slotMat };
+    const hhInfo = {
+      style: p.shelfStyle === 'basket' ? 'basket' : 'basic',
+      slotMat,
+      product: p,
+    };
     frame.userData.hh = hhInfo;
     foot.userData.hh = hhInfo;
   }
@@ -1366,7 +1413,16 @@ function addBoardWithBeams(
   } = opts;
 
   if (frameMat.userData && frameMat.userData.hh) {
-    addHHLevel(group, w, d, yBoardCenter, boardMat, frameMat, thickness);
+    addHHLevel(
+      group,
+      w,
+      d,
+      yBoardCenter,
+      boardMat,
+      frameMat,
+      thickness,
+      opts.hhStyle
+    );
     return;
   }
 
@@ -1430,16 +1486,22 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
     : bottomLift + beamH + thickness / 2;
   const yBoardTop = h - thickness / 2;
   const start = skipBottom ? 1 : 0;
+  // HOMEDANT HOUSE: every level carries its own height and style
+  const hhLevels = isHH
+    ? hhResolveLevels(frameMat.userData.hh.product, tiers)
+    : null;
   for (let i = start; i < tiers; i++) {
     let y;
     if (tiers === 1) y = yBoardTop;
     else if (i === 0) y = yBoardBottom;
     else y = yBoardBottom + (i / (tiers - 1)) * (yBoardTop - yBoardBottom);
+    if (hhLevels) y = hhLevels[i].h * MM_TO_M - thickness / 2;
     addBoardWithBeams(group, w, d, y, boardMat, frameMat, {
       postSize,
       thickness,
       beamH,
       beamW,
+      hhStyle: hhLevels ? hhLevels[i].style : undefined,
     });
   }
 }
@@ -1462,6 +1524,128 @@ function buildShelf(group, p, tpl) {
   addPostFeet(group, w, d, mats.foot, 0.025);
 }
 
+/* HOMEDANT HOUSE hanger bar: a bright steel tube running the width of
+   the shelf, held by a round cup on the inside of each SIDE beam of the
+   top level, low on the beam so the cup hangs just below its edge.     */
+function addHHHangerBar(group, w, d, frameMat, tiers) {
+  const { postT: T, sheet: t, beamH: BH } = HH;
+  const hh = frameMat.userData.hh;
+  const lv = hhResolveLevels(hh.product, tiers);
+  const top = lv[lv.length - 1];
+  const beamTop = top.h * MM_TO_M - (top.style === 'basket' ? 0 : 0.009);
+  const y = beamTop - BH + 0.005;
+  const len = w - 2 * (T + t);
+  const steel = new THREE.MeshStandardMaterial({
+    color: 0xe8ebee,
+    metalness: 0.15,
+    roughness: 0.25,
+    emissive: 0x2e2e2e, // keeps the bright tube from going grey in shade
+  });
+  const rodGeo = new THREE.CylinderGeometry(0.0125, 0.0125, len - 0.02, 20);
+  rodGeo.rotateZ(Math.PI / 2);
+  hhAdd(group, rodGeo, steel, 0, y, 0);
+  const cupGeo = new THREE.CylinderGeometry(0.019, 0.019, 0.014, 20);
+  cupGeo.rotateZ(Math.PI / 2);
+  [-1, 1].forEach((s) => {
+    hhAdd(group, cupGeo, frameMat, s * (len / 2 - 0.007), y, 0);
+  });
+}
+
+/* HOMEDANT HOUSE caster set: a zinc bracket pushed up inside the bottom
+   of each post, and a 3-inch swivel caster bolted into it. The caster
+   is 104 mm from the floor to the underside of the post. Built around
+   the swivel axis, with the wheel trailing behind it.                  */
+const HH_CASTER_H = 0.104;
+function addHHCaster(group, x, z, angle, brake) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  g.rotation.y = angle;
+  const black = new THREE.MeshStandardMaterial({
+    color: 0x161616,
+    metalness: 0.2,
+    roughness: 0.5,
+  });
+  const tyre = new THREE.MeshStandardMaterial({
+    color: 0x101010,
+    metalness: 0,
+    roughness: 0.35,
+  });
+  const hub = new THREE.MeshStandardMaterial({
+    color: 0xcfc7b2,
+    metalness: 0,
+    roughness: 0.5,
+  });
+  const steel = new THREE.MeshStandardMaterial({
+    color: 0xe2e5e8,
+    metalness: 0.15,
+    roughness: 0.3,
+  });
+  const R = 0.038; // 3-inch wheel
+  const trail = -0.026; // wheel centre sits behind the swivel axis
+  const axis = (geo) => {
+    geo.rotateX(Math.PI / 2); // lay the cylinder on its side (axle along z)
+    return geo;
+  };
+  // wheel: black tyre, pale hub showing on both faces, axle nut
+  hhAdd(g, axis(new THREE.CylinderGeometry(R, R, 0.022, 28)), tyre, trail, R, 0);
+  hhAdd(g, axis(new THREE.CylinderGeometry(R * 0.72, R * 0.72, 0.024, 24)), hub, trail, R, 0);
+  hhAdd(g, axis(new THREE.CylinderGeometry(0.012, 0.012, 0.026, 16)), black, trail, R, 0);
+  hhAdd(g, axis(new THREE.CylinderGeometry(0.0065, 0.0065, 0.04, 6)), steel, trail, R, 0);
+  // fork: one swept plate each side of the wheel, joined across the top
+  const side = new THREE.Shape();
+  side.moveTo(-0.06, 0.09);
+  side.lineTo(0.03, 0.09);
+  side.lineTo(-0.006, 0.026);
+  side.lineTo(-0.042, 0.026);
+  side.lineTo(-0.06, 0.07);
+  side.closePath();
+  const sideGeo = new THREE.ExtrudeGeometry(side, {
+    depth: 0.002,
+    bevelEnabled: false,
+  });
+  hhAdd(g, sideGeo, black, 0, 0, 0.0145);
+  hhAdd(g, sideGeo, black, 0, 0, -0.0165);
+  hhAdd(g, new THREE.BoxGeometry(0.09, 0.004, 0.033), black, -0.015, 0.09, 0);
+  // swivel plate, lock nut and the threaded stem that goes up into the bracket
+  hhAdd(g, new THREE.CylinderGeometry(0.027, 0.027, 0.008, 24), black, 0, 0.096, 0);
+  hhAdd(g, new THREE.CylinderGeometry(0.009, 0.009, 0.005, 6), steel, 0, 0.1015, 0);
+  hhAdd(g, new THREE.CylinderGeometry(0.005, 0.005, 0.03, 10), steel, 0, 0.115, 0);
+  if (brake) {
+    // foot brake lever sticking out behind the wheel
+    hhAdd(g, new THREE.BoxGeometry(0.036, 0.006, 0.02), black, -0.076, 0.085, 0);
+    hhAdd(g, new THREE.BoxGeometry(0.014, 0.012, 0.02), black, -0.097, 0.082, 0);
+  }
+  group.add(g);
+}
+
+function addHHCasters(group, inner, w, d) {
+  const { postT: T } = HH;
+  const zinc = new THREE.MeshStandardMaterial({
+    color: 0xc9cdd2,
+    metalness: 0.2,
+    roughness: 0.4,
+  });
+  const plateX = new THREE.BoxGeometry(0.03, 0.07, 0.0015);
+  const plateZ = new THREE.BoxGeometry(0.0015, 0.07, 0.03);
+  const base = new THREE.BoxGeometry(0.036, 0.003, 0.036);
+  [
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+    [1, 1],
+  ].forEach(([sx, sz]) => {
+    const ex = sx * (w / 2),
+      ez = sz * (d / 2);
+    // bracket: two plates against the inside of the post + a base plate
+    hhAdd(inner, plateX, zinc, ex - sx * (T + 0.019), 0.035, ez - sz * (T + 0.001));
+    hhAdd(inner, plateZ, zinc, ex - sx * (T + 0.001), 0.035, ez - sz * (T + 0.019));
+    hhAdd(inner, base, zinc, ex - sx * 0.022, 0.0015, ez - sz * 0.022);
+    // caster under the bracket; the front pair carries the brakes
+    const angle = (sx > 0 ? Math.PI : 0) + sz * 0.4;
+    addHHCaster(group, ex - sx * 0.022, ez - sz * 0.022, angle, sz > 0);
+  });
+}
+
 function buildGarmentRack(group, p, tpl) {
   const w = p.width * MM_TO_M,
     d = p.depth * MM_TO_M,
@@ -1476,21 +1660,25 @@ function buildGarmentRack(group, p, tpl) {
   addTierBoards(group, w, d, h, p.tier || tpl.defaultTier, mats.board, {
     frameMat: mats.frame,
   });
-  // hanger bar — sits just below the top board so clothes hang from the
-  // top of the rack like a real garment rack (was floating mid-height).
-  const barGeo = new THREE.CylinderGeometry(0.012, 0.012, w - 0.06, 12);
-  const bar = new THREE.Mesh(barGeo, mats.frame);
-  bar.rotation.z = Math.PI / 2;
-  bar.position.set(0, h - 0.1, 0); // ~100mm under the top board
-  bar.castShadow = true;
-  group.add(bar);
-  // two short drop brackets connecting the bar up to the top board
-  const dropGeo = new THREE.BoxGeometry(0.012, 0.085, 0.012);
-  [-(w / 2) + 0.1, w / 2 - 0.1].forEach((bx) => {
-    const drop = new THREE.Mesh(dropGeo, mats.frame);
-    drop.position.set(bx, h - 0.055, 0);
-    group.add(drop);
-  });
+  if (mats.frame.userData.hh) {
+    addHHHangerBar(group, w, d, mats.frame, p.tier || tpl.defaultTier);
+  } else {
+    // hanger bar — sits just below the top board so clothes hang from the
+    // top of the rack like a real garment rack (was floating mid-height).
+    const barGeo = new THREE.CylinderGeometry(0.012, 0.012, w - 0.06, 12);
+    const bar = new THREE.Mesh(barGeo, mats.frame);
+    bar.rotation.z = Math.PI / 2;
+    bar.position.set(0, h - 0.1, 0); // ~100mm under the top board
+    bar.castShadow = true;
+    group.add(bar);
+    // two short drop brackets connecting the bar up to the top board
+    const dropGeo = new THREE.BoxGeometry(0.012, 0.085, 0.012);
+    [-(w / 2) + 0.1, w / 2 - 0.1].forEach((bx) => {
+      const drop = new THREE.Mesh(dropGeo, mats.frame);
+      drop.position.set(bx, h - 0.055, 0);
+      group.add(drop);
+    });
+  }
   addPostFeet(group, w, d, mats.foot, 0.025);
 }
 
@@ -1498,20 +1686,25 @@ function buildRolling(group, p, tpl) {
   const w = p.width * MM_TO_M,
     d = p.depth * MM_TO_M,
     h = p.height * MM_TO_M;
-  const wheelR = 0.04;
   const perforated = tpl.brand === 'SPEEDRACK';
   const mats = makeMaterials(p, {
     perforated,
     house: tpl.brand === 'HOMEDANT HOUSE',
   });
-  // shift everything up by wheelR*2
+  const isHH = !!mats.frame.userData.hh;
+  const wheelR = 0.04;
+  // the frame is lifted by the height of the wheels
   const inner = new THREE.Group();
-  inner.position.y = wheelR * 2;
+  inner.position.y = isHH ? HH_CASTER_H : wheelR * 2;
   addPosts(inner, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   addTierBoards(inner, w, d, h, p.tier || tpl.defaultTier, mats.board, {
     frameMat: mats.frame,
   });
   group.add(inner);
+  if (isHH) {
+    addHHCasters(group, inner, w, d);
+    return;
+  }
   // wheels
   const wheelGeo = new THREE.CylinderGeometry(wheelR, wheelR, 0.025, 16);
   const wheelMat = new THREE.MeshStandardMaterial({
@@ -2152,7 +2345,7 @@ export default function BoothSimulator() {
   });
   const [products, setProducts] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [activeBrand, setActiveBrand] = useState('SPEEDRACK');
+  const [activeBrand, setActiveBrand] = useState(LIBRARY_BRANDS[0]);
   const [viewMode, setViewMode] = useState('3d');
   const [warnings, setWarnings] = useState({}); // instanceId -> reason
   // current layout name (used in exported PNG filenames)
@@ -2517,7 +2710,11 @@ export default function BoothSimulator() {
       const tpl = PRODUCT_LIBRARY.find((t) => t.id === p.productId);
       if (!tpl) return;
       let mesh = map.get(p.instanceId);
-      const fingerprint = `${p.width}-${p.depth}-${p.height}-${p.tier}-${p.frameColor}-${p.boardColor}-${p.shelfStyle || 'basic'}`;
+      const fingerprint = `${p.width}-${p.depth}-${p.height}-${p.tier}-${p.frameColor}-${p.boardColor}-${p.shelfStyle || 'basic'}-${p.levelsKey || ''}-${
+        Array.isArray(p.levels)
+          ? p.levels.map((l) => `${l.h}${l.style}`).join('.')
+          : ''
+      }`;
       if (!mesh || mesh.userData.fingerprint !== fingerprint) {
         if (mesh) {
           group.remove(mesh);
@@ -3301,7 +3498,7 @@ export default function BoothSimulator() {
               Product Library
             </div>
             <div className="flex gap-1">
-              {['SPEEDRACK', 'HOMEDANT HOUSE', 'Exhibition'].map((b) => (
+              {LIBRARY_BRANDS.map((b) => (
                 <button
                   key={b}
                   onClick={() => setActiveBrand(b)}
@@ -3768,12 +3965,19 @@ function PropertyPanel({
           </div>
         </Field>
         {tpl.brand === 'HOMEDANT HOUSE' && (
-          <Field label="Shelf style">
+          <Field label="Shelf style (all levels)">
             <div className="flex gap-1.5">
               {['basic', 'basket'].map((c) => (
                 <button
                   key={c}
-                  onClick={() => update({ shelfStyle: c })}
+                  onClick={() =>
+                    update({
+                      shelfStyle: c,
+                      levels: Array.isArray(product.levels)
+                        ? product.levels.map((l) => ({ ...l, style: c }))
+                        : product.levels,
+                    })
+                  }
                   className={`flex-1 text-xs py-1.5 rounded border transition ${
                     (product.shelfStyle || 'basic') === c
                       ? 'border-gray-900 bg-gray-900 text-white'
@@ -3787,6 +3991,10 @@ function PropertyPanel({
           </Field>
         )}
       </Section>
+
+      {tpl.brand === 'HOMEDANT HOUSE' && HH_LEVEL_TYPES.includes(tpl.type) && (
+        <HHLevelEditor product={product} tpl={tpl} update={update} />
+      )}
 
       {/* position */}
       <Section title="Position & Rotation">
@@ -3962,6 +4170,91 @@ function IconBtn({ children, onClick, title }) {
     >
       {children}
     </button>
+  );
+}
+
+/* Per-level controls for HOMEDANT HOUSE shelves: drag a slider to move a
+   level up or down (it snaps to the post slots) and switch that level
+   between basic and basket. Listed top level first, like the shelf.   */
+function HHLevelEditor({ product, tpl, update }) {
+  const tiers = product.tier || tpl.defaultTier;
+  const levels = hhResolveLevels(product, tiers);
+  const custom = levels === product.levels;
+  const first = tpl.type === 'open_base' ? 1 : 0; // open base has no bottom board
+  const commit = (next) =>
+    update({ levels: next, levelsKey: hhLevelKey(product) });
+  const setHeight = (i, raw) => {
+    const min = i === 0 ? HH_LEVEL_MIN : levels[i - 1].h + HH_LEVEL_GAP;
+    const max =
+      i === levels.length - 1 ? product.height : levels[i + 1].h - HH_LEVEL_GAP;
+    let v =
+      HH_LEVEL_MIN +
+      Math.round((raw - HH_LEVEL_MIN) / HH_LEVEL_STEP) * HH_LEVEL_STEP;
+    if (raw >= max - HH_LEVEL_STEP / 2) v = max; // let a level reach its top stop
+    v = Math.max(min, Math.min(max, v));
+    if (v === levels[i].h) return;
+    commit(levels.map((l, k) => (k === i ? { ...l, h: v } : l)));
+  };
+  const toggle = (i) =>
+    commit(
+      levels.map((l, k) =>
+        k === i ? { ...l, style: l.style === 'basket' ? 'basic' : 'basket' } : l
+      )
+    );
+  const rows = [];
+  for (let i = levels.length - 1; i >= first; i--) {
+    const min = i === 0 ? HH_LEVEL_MIN : levels[i - 1].h + HH_LEVEL_GAP;
+    const max =
+      i === levels.length - 1 ? product.height : levels[i + 1].h - HH_LEVEL_GAP;
+    rows.push(
+      <div key={i} className="flex items-center gap-2 mb-2">
+        <span className="flex-none w-4 text-xs text-gray-500">{i + 1}</span>
+        <input
+          type="range"
+          min={min}
+          max={Math.max(min, max)}
+          step={1}
+          value={levels[i].h}
+          disabled={max <= min}
+          onChange={(e) => setHeight(i, parseInt(e.target.value, 10))}
+          className="flex-1 min-w-0"
+        />
+        <span className="flex-none w-14 text-right text-xs text-gray-700 tabular-nums">
+          {levels[i].h} mm
+        </span>
+        <button
+          onClick={() => toggle(i)}
+          className={`flex-none w-14 text-xs py-1 rounded border transition ${
+            levels[i].style === 'basket'
+              ? 'border-gray-900 bg-gray-900 text-white'
+              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+          }`}
+          title="Switch this level between basic and basket"
+        >
+          {levels[i].style}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <Section title="Shelf Levels">
+      <div className="text-xs text-gray-500 mb-2">
+        Height from the post bottom to the top of each level. Level 1 is the
+        lowest.
+      </div>
+      {rows}
+      <button
+        onClick={() => update({ levels: undefined, levelsKey: undefined })}
+        disabled={!custom}
+        className={`w-full text-xs py-1.5 rounded border transition ${
+          custom
+            ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+            : 'border-gray-200 bg-gray-50 text-gray-400'
+        }`}
+      >
+        Reset to even spacing
+      </button>
+    </Section>
   );
 }
 
