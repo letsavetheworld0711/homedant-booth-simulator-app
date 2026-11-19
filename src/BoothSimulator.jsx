@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
   Plus,
   Trash2,
@@ -1084,6 +1085,7 @@ const KO = {
   "Books (flat)": "눕힌 책",
   "Jars": "유리병",
   "Plant": "화분",
+  "Vase": "꽃병",
   "Towels": "수건",
   "Soccer ball": "축구공",
   "Suitcase": "캐리어",
@@ -1987,6 +1989,88 @@ function displayKit(group, seed) {
   return { rng, R, pick, mat, put, sub };
 }
 
+/* ----- real prop models -----
+   Photo-scanned style models (Poly Haven, CC0) for the display items,
+   kept in ./propModels.js and fetched in the background after the page
+   has loaded. Until they arrive, and for item types that have no model
+   (jars, towels, flat books), the simple shapes below are used.
+   PROP_MODELS[name] = { scene, size } with the model centred on x/z and
+   standing on y = 0. Instances are clones that share the cached geometry
+   and materials, marked sharedAsset so product clean-up leaves them be. */
+const PROP_MODELS = {};
+let _propLoad = null;
+function loadPropModels() {
+  if (_propLoad) return _propLoad;
+  _propLoad = import('./propModels.js')
+    .then((mod) => {
+      const loader = new GLTFLoader();
+      const jobs = Object.entries(mod.default).map(
+        ([name, b64]) =>
+          new Promise((resolve) => {
+            const bin = atob(b64);
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            loader.parse(
+              bytes.buffer,
+              '',
+              (gltf) => {
+                const scene = gltf.scene;
+                scene.updateMatrixWorld(true);
+                const box = new THREE.Box3().setFromObject(scene);
+                const size = box.getSize(new THREE.Vector3());
+                const holder = new THREE.Group();
+                scene.position.set(
+                  -(box.min.x + box.max.x) / 2,
+                  -box.min.y,
+                  -(box.min.z + box.max.z) / 2
+                );
+                holder.add(scene);
+                holder.traverse((o) => {
+                  o.userData.sharedAsset = true;
+                  if (!o.isMesh) return;
+                  o.castShadow = true;
+                  o.receiveShadow = true;
+                  const m = o.material;
+                  if (m.map) {
+                    // this app does not colour-manage, so use the texture
+                    // values as they are, like every other texture here
+                    m.map.encoding = THREE.LinearEncoding;
+                    m.map.needsUpdate = true;
+                  }
+                  m.color.multiplyScalar(0.88); // scene lights run bright
+                  m.metalness = 0;
+                  m.needsUpdate = true;
+                });
+                PROP_MODELS[name] = { scene: holder, size };
+                resolve();
+              },
+              () => resolve() // a model that fails just keeps its simple shape
+            );
+          })
+      );
+      return Promise.all(jobs).then(() => true);
+    })
+    .catch(() => false);
+  return _propLoad;
+}
+/* Put a model in group g so it fits maxW x maxD x maxH, turning it a
+   quarter turn if that fits better. Returns false if there is no such
+   model yet or it would have to shrink below minScale.                */
+function placePropModel(g, name, maxW, maxD, maxH, turn = 0, minScale = 0.5, maxScale = 1) {
+  const m = PROP_MODELS[name];
+  if (!m) return false;
+  const fit = (sx, sz) => Math.min(maxScale, maxW / sx, maxD / sz, maxH / m.size.y);
+  const straight = fit(m.size.x, m.size.z);
+  const turned = fit(m.size.z, m.size.x);
+  const s = Math.max(straight, turned);
+  if (s < minScale) return false;
+  const obj = m.scene.clone(true);
+  obj.scale.setScalar(s);
+  obj.rotation.y = (turned > straight ? Math.PI / 2 : 0) + turn;
+  g.add(obj);
+  return true;
+}
+
 /* Item types the user can pick for a slot, with the free height each
    needs at full size. A picked item that is a little too tall for its
    level is scaled down to fit; one that is far too tall is left out.   */
@@ -1997,6 +2081,7 @@ const DISPLAY_ITEMS = [
   ['booksFlat', 'Books (flat)', 0.08],
   ['jars', 'Jars', 0.22],
   ['plant', 'Plant', 0.42],
+  ['vase', 'Vase', 0.3],
   ['towels', 'Towels', 0.08],
   ['ball', 'Soccer ball', 0.24],
   ['suitcase', 'Suitcase', 0.64],
@@ -2035,6 +2120,7 @@ function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0, picks = null
       if (clear >= 0.22) options.push(['jars', 2]);
       if (clear >= 0.24) options.push(['ball', 0.7]);
       if (clear >= 0.3) options.push(['booksUp', 2.5]);
+      if (clear >= 0.3) options.push(['vase', 1]);
       if (clear >= 0.42) options.push(['plant', 1.5]);
       if (clear >= 0.64 && slotW >= 0.44 && usableD >= 0.26) options.push(['suitcase', 2]);
       let total = 0;
@@ -2047,6 +2133,60 @@ function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0, picks = null
           type = o[0];
           break;
         }
+      }
+    }
+    // real model first, at its true size where it fits
+    {
+      const room = clear - 0.02;
+      const yaw = R(-0.15, 0.15);
+      let placed = false;
+      if (type === 'plant') {
+        // the tall leafy plant when there is height for it, else the small pot
+        if (room >= 0.5 && rng() < 0.6)
+          placed = placePropModel(g, 'plantBig', slotW * 1.25, usableD * 1.5, Math.min(room, 0.62), R(0, 6), 0.4, 0.75);
+        if (!placed) placed = placePropModel(g, 'plant', slotW * 0.8, usableD * 0.8, room, R(0, 6));
+      } else if (type === 'box') {
+        placed = placePropModel(g, 'box', slotW * 0.86 * R(0.8, 1), usableD * 0.92, room, R(-0.06, 0.06), 0.45);
+      } else if (type === 'basket') {
+        placed = placePropModel(g, 'basket', slotW * 0.9, usableD * 0.9, room, R(-0.2, 0.2));
+      } else if (type === 'ball') {
+        placed = placePropModel(g, 'ball', slotW * 0.9, usableD * 0.9, room, R(0, 6), 0.8);
+        if (placed) {
+          // spin the ball about its own centre so each one shows a different side
+          const obj = g.children[0];
+          const r = (PROP_MODELS.ball.size.y / 2) * obj.scale.y;
+          const pivot = new THREE.Group();
+          pivot.position.y = r;
+          obj.position.y = -r;
+          obj.rotation.y = 0;
+          g.remove(obj);
+          pivot.add(obj);
+          pivot.rotation.set(R(0, 6), R(0, 6), R(0, 6));
+          g.add(pivot);
+        }
+      } else if (type === 'suitcase') {
+        placed = placePropModel(g, 'suitcase', slotW * 0.95, usableD * 0.95, room, R(-0.05, 0.05), 0.55);
+      } else if (type === 'vase') {
+        placed = placePropModel(g, rng() < 0.5 ? 'vase1' : 'vase2', slotW * 0.6, usableD * 0.7, Math.min(room, 0.4), yaw, 0.6);
+      } else if (type === 'booksUp' && PROP_MODELS.books) {
+        // one or two runs of books side by side
+        const bw = PROP_MODELS.books.size.x;
+        const s = Math.min(1, (room - 0.01) / PROP_MODELS.books.size.y, (usableD * 0.95) / PROP_MODELS.books.size.z);
+        if (s >= 0.6) {
+          const n = Math.max(1, Math.min(2, Math.floor((slotW * 0.9) / (bw * s))));
+          for (let i = 0; i < n; i++) {
+            const run = PROP_MODELS.books.scene.clone(true);
+            run.scale.setScalar(s);
+            run.position.x = (i - (n - 1) / 2) * bw * s;
+            if (i % 2) run.rotation.y = Math.PI;
+            g.add(run);
+          }
+          placed = true;
+        }
+      }
+      if (placed) {
+        group.add(g);
+        continue;
       }
     }
     // c = the height the item is built for; shrink the whole item if the
@@ -2124,6 +2264,11 @@ function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0, picks = null
           rr = R(0, 0.07);
         put(g, new THREE.IcosahedronGeometry(R(0.05, 0.08), 1), mat(pick(greens), 0.9), Math.cos(a) * rr, 0.13 + rng() * (top - 0.08), Math.sin(a) * rr);
       }
+    } else if (type === 'vase') {
+      const h = Math.min(0.32, c - 0.04);
+      const glaze = mat(pick([0xb9b9b4, 0x8fa3a8, 0xa9836a]), 0.4);
+      put(g, new THREE.CylinderGeometry(0.035, 0.07, h * 0.6, 20), glaze, 0, h * 0.3, 0);
+      put(g, new THREE.CylinderGeometry(0.03, 0.035, h * 0.4, 20), glaze, 0, h * 0.8, 0);
     } else if (type === 'towels') {
       const tones = [0xdedad2, 0xb9c4b4, 0xd9b9b3, 0x8f9aa8];
       const n = Math.max(1, Math.min(4, Math.floor((c - 0.02) / 0.05)));
@@ -3160,6 +3305,18 @@ export default function BoothSimulator() {
     }
   };
   const [showPeople, setShowPeople] = useState(false);
+  // real prop models load in the background; shelves with display items
+  // are redrawn once they are ready
+  const [propsReady, setPropsReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    loadPropModels().then((ok) => {
+      if (ok && alive) setPropsReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [products, setProducts] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [activeBrand, setActiveBrand] = useState(LIBRARY_BRANDS[0]);
@@ -3586,7 +3743,11 @@ export default function BoothSimulator() {
         Array.isArray(p.levels)
           ? p.levels.map((l) => `${l.h}${l.style}`).join('.')
           : ''
-      }-${p.showItems ? `items${JSON.stringify(p.itemPicks || '')}` : ''}`;
+      }-${
+        p.showItems
+          ? `items${propsReady ? 'R' : ''}${JSON.stringify(p.itemPicks || '')}`
+          : ''
+      }`;
       if (!mesh || mesh.userData.fingerprint !== fingerprint) {
         if (mesh) {
           group.remove(mesh);
@@ -3642,7 +3803,7 @@ export default function BoothSimulator() {
       }
     }
     setWarnings(newWarn);
-  }, [products, booth.width, booth.depth]);
+  }, [products, booth.width, booth.depth, propsReady]);
 
   /* ---------- selection / warning highlight ---------- */
   useEffect(() => {
@@ -5672,6 +5833,7 @@ function createOrbitControls(camera, dom) {
    ============================================================ */
 function disposeGroup(g) {
   g.traverse((c) => {
+    if (c.userData && c.userData.sharedAsset) return; // cached prop model
     if (c.geometry) c.geometry.dispose();
     if (c.material) {
       if (Array.isArray(c.material)) c.material.forEach((m) => m.dispose());
