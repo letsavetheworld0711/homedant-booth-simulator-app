@@ -329,6 +329,21 @@ const PRODUCT_LIBRARY = [
   },
 
   {
+    id: 'ex_logo_table',
+    brand: 'Exhibition',
+    category: 'Logo Table',
+    name: 'Logo Table',
+    type: 'logo_table',
+    defaultSize: { width: 1500, depth: 600, height: 750 },
+    sizeOptions: EXHIBITION_SIZES,
+    tierOptions: [1],
+    defaultTier: 1,
+    frameColors: ['white'],
+    boardColors: ['white'],
+    addOns: [],
+  },
+
+  {
     id: 'ex_chair',
     brand: 'Exhibition',
     category: 'Chair',
@@ -1033,32 +1048,36 @@ const KO = {
   "Add-on Options": "추가 옵션",
   "Summary": "요약",
   "Duplicate": "복제",
-  "House Shelf": "하우스 선반",
-  "House Garment Rack": "하우스 행거",
-  "House Rolling Shelf": "하우스 이동식 선반",
-  "House Slim Shelf": "하우스 슬림 선반",
-  "House Open Base Shelf": "하우스 오픈베이스 선반",
-  "House Pegboard Shelf": "하우스 펀칭 선반",
-  "House Drawer Shelf": "하우스 서랍 선반",
-  "House Cabinet Shelf": "하우스 캐비닛 선반",
-  "Shelf": "선반",
+  "House Shelf": "일반 선반",
+  "House Garment Rack": "행거 선반",
+  "House Rolling Shelf": "바퀴선반",
+  "House Slim Shelf": "틈새선반",
+  "House Open Base Shelf": "오픈베이스 선반",
+  "House Pegboard Shelf": "타공선반",
+  "House Drawer Shelf": "서랍행거",
+  "House Cabinet Shelf": "캐비닛 선반",
+  "Shelf": "일반 선반",
   "Heavy Duty Shelf": "중량 선반",
   "Washer / Dryer Shelf": "세탁기 선반",
   "Washing Machine Shelf": "세탁기 선반",
-  "Slim Shelf": "슬림 선반",
+  "Slim Shelf": "틈새선반",
   "Open Base Shelf": "오픈베이스 선반",
-  "Garment Rack": "행거",
-  "Rolling Shelf": "이동식 선반",
-  "Drawer Shelf": "서랍 선반",
+  "Garment Rack": "행거 선반",
+  "Rolling Shelf": "바퀴선반",
+  "Drawer Shelf": "서랍행거",
   "Cabinet Shelf": "캐비닛 선반",
-  "Pegboard Shelf": "펀칭 선반",
-  "Banner Stand": "배너 거치대",
+  "Pegboard Shelf": "타공선반",
+  "Banner Stand": "롤업 배너",
   "Catalog Stand": "카탈로그 거치대",
   "Chair": "의자",
   "Counseling Table": "상담 테이블",
   "Poster Panel": "포스터 패널",
   "Sample Display Table": "샘플 진열대",
   "TV Stand": "TV 거치대",
+  "Logo Table": "로고 테이블",
+  "Display items": "진열 물건",
+  "off": "끔",
+  "on": "켬",
   "additional shelf": "추가 선반",
   "cabinet": "캐비닛",
   "caster": "바퀴",
@@ -1066,7 +1085,7 @@ const KO = {
   "drawer": "서랍",
   "handle": "손잡이",
   "hanger bar": "행거봉",
-  "pegboard": "펀칭 패널",
+  "pegboard": "타공 패널",
   "side panel": "측면 패널",
   "Save design as:": "저장할 디자인 이름:",
   "Rename design:": "새 이름:",
@@ -1092,6 +1111,8 @@ function loadLang() {
    'dark'   - dark hall floor with a blue aisle, like a convention centre
    Colours are material colours; up-facing surfaces read about 1.46x
    brighter on screen under the scene lights.                          */
+// look used for new booths and for saved layouts made before looks existed
+const DEFAULT_LOOK = 'carpet';
 const BOOTH_LOOKS = {
   plan: {
     label: 'Plan',
@@ -1289,6 +1310,8 @@ const LIBRARY_BRANDS = ['HOMEDANT HOUSE', 'Exhibition'];
    spread. Beams hook into the post slots, so heights move in slot-pitch
    steps.                                                               */
 const HH_LEVEL_TYPES = ['shelf', 'open_base', 'garment', 'rolling'];
+// products that can be dressed with display items
+const HH_ITEM_TYPES = ['shelf', 'open_base', 'garment', 'rolling', 'pegboard'];
 const HH_LEVEL_MIN = 112; // lowest level: 50 gap + 53 beam + 9 board
 const HH_LEVEL_STEP = 33; // slot pitch
 const HH_LEVEL_GAP = 99; // minimum distance between two levels
@@ -1855,6 +1878,33 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
       beamW,
       hhStyle: hhLevels ? hhLevels[i].style : undefined,
     });
+    const hh = isHH ? frameMat.userData.hh : null;
+    if (hhLevels && hh.product.showItems) {
+      // dress the level: work out its board surface and the room above it
+      const L = hhLevels[i];
+      const basket = L.style === 'basket';
+      const top = basket
+        ? L.h * MM_TO_M - HH.beamH + HH.sheet + thickness
+        : L.h * MM_TO_M;
+      let clear = 0.42; // top level: open above
+      if (i < tiers - 1) {
+        const N = hhLevels[i + 1];
+        const nextBeamBottom =
+          N.h * MM_TO_M - HH.beamH - (N.style === 'basket' ? 0 : thickness);
+        clear = nextBeamBottom - top - 0.015;
+      }
+      // under a hanger bar the clothes need most of the height
+      if (hh.garment && i === tiers - 2) clear *= 0.3;
+      addDisplayItems(
+        group,
+        w,
+        d,
+        top,
+        Math.min(clear, 0.75),
+        hashSeed(hh.product.instanceId || 'item') + i * 977,
+        basket ? 0.012 : 0
+      );
+    }
   }
 }
 
@@ -1874,6 +1924,207 @@ function buildShelf(group, p, tpl) {
     frameMat: mats.frame,
   });
   addPostFeet(group, w, d, mats.foot, 0.025);
+}
+
+/* ===== display items =====
+   Everyday things placed on the shelves so a booth reads as a dressed
+   display instead of bare shelving: boxes, baskets, books, jars, plants,
+   towels and a suitcase, plus clothes on the hanger bar. What goes where
+   is picked from a random sequence seeded by the product's id and the
+   level, so a shelf keeps the same items every time it is redrawn.     */
+function hashSeed(str) {
+  let h = 2166136261;
+  for (const ch of String(str)) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function makeRng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function displayKit(group, seed) {
+  const rng = makeRng(seed);
+  const R = (a, b) => a + rng() * (b - a);
+  const pick = (arr) => arr[Math.floor(rng() * arr.length)];
+  const mat = (c, rough = 0.85) =>
+    new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0 });
+  const put = (parent, geo, m, x, y, z) => {
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  };
+  const sub = (x, y, z, turn = 0) => {
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    g.rotation.y = turn;
+    group.add(g);
+    return g;
+  };
+  return { rng, R, pick, mat, put, sub };
+}
+
+/* Fill one shelf level. yTop = top surface of the board, clear = free
+   height above it, inset = extra margin when the board sits in a basket */
+function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0) {
+  const { rng, R, pick, mat, put, sub } = displayKit(group, seed);
+  const usableW = w - 2 * inset - 0.07;
+  const usableD = d - 2 * inset - 0.07;
+  if (clear < 0.08 || usableW < 0.15 || usableD < 0.15) return;
+  const slots = usableW >= 1.0 ? 3 : usableW >= 0.6 ? 2 : 1;
+  const slotW = usableW / slots;
+
+  const makers = {
+    box: (cx) => {
+      const bw = Math.min(slotW * 0.82, 0.38) * R(0.75, 1);
+      const bd = Math.min(usableD * 0.85, 0.32) * R(0.8, 1);
+      const bh = Math.min(clear * 0.75, 0.28) * R(0.6, 1);
+      const kraft = mat(pick([0x8a6a45, 0x9a7850, 0x7d6040]));
+      const g = sub(cx, yTop, R(-0.02, 0.02), R(-0.12, 0.12));
+      put(g, new THREE.BoxGeometry(bw, bh, bd), kraft, 0, bh / 2, 0);
+      put(g, new THREE.BoxGeometry(bw * 0.14, 0.002, bd * 1.001), mat(0xb7a07a), 0, bh + 0.001, 0);
+      if (clear > bh + 0.16 && rng() < 0.4) {
+        const sw = bw * R(0.6, 0.85),
+          sh = Math.min(0.12, clear - bh - 0.04) * R(0.7, 1),
+          sd = bd * R(0.6, 0.85);
+        const top = put(g, new THREE.BoxGeometry(sw, sh, sd), mat(pick([0x9a7850, 0xcfc8ba, 0x6f7c86])), R(-0.02, 0.02), bh + sh / 2, 0);
+        top.rotation.y = R(-0.2, 0.2);
+      }
+    },
+    basket: (cx) => {
+      const r = Math.min(Math.min(slotW, usableD) * 0.5 * R(0.72, 0.86), 0.17);
+      const h = Math.min(clear * 0.6, 0.2) * R(0.8, 1);
+      const g = sub(cx, yTop, R(-0.02, 0.02));
+      put(g, new THREE.CylinderGeometry(r, r * 0.82, h, 20), mat(pick([0x8f6f45, 0xa58555, 0x6d5335]), 0.95), 0, h / 2, 0);
+      put(g, new THREE.CylinderGeometry(r * 0.9, r * 0.9, 0.004, 20), mat(0x3f3122), 0, h + 0.001, 0);
+      const fill = mat(pick([0xb99a62, 0xa8553a, 0x8a9a4a]));
+      const n = 3 + Math.floor(rng() * 3);
+      for (let i = 0; i < n; i++) {
+        const a = rng() * Math.PI * 2,
+          rr = r * R(0.1, 0.55);
+        put(g, new THREE.SphereGeometry(r * R(0.22, 0.3), 10, 8), fill, Math.cos(a) * rr, h + r * 0.06, Math.sin(a) * rr);
+      }
+    },
+    booksUp: (cx) => {
+      const span = Math.min(slotW * 0.8, 0.3);
+      const tones = [0x394a63, 0x6b3a3a, 0x40584a, 0x8a7a55, 0x2c2c30, 0xb7b0a2, 0x7a5a6a];
+      let x = cx - span / 2;
+      while (x < cx + span / 2 - 0.02) {
+        const t = R(0.018, 0.04),
+          bh = Math.min(R(0.19, 0.26), clear - 0.03),
+          bd = Math.min(R(0.14, 0.19), usableD * 0.9);
+        put(group, new THREE.BoxGeometry(t, bh, bd), mat(pick(tones), 0.7), x + t / 2, yTop + bh / 2, 0);
+        x += t + 0.002;
+      }
+    },
+    booksFlat: (cx) => {
+      const tones = [0x394a63, 0x6b3a3a, 0x40584a, 0x8a7a55, 0xb7b0a2];
+      const n = Math.max(1, Math.min(4, Math.floor((clear - 0.02) / 0.032)));
+      const g = sub(cx, yTop, 0, R(-0.25, 0.25));
+      for (let i = 0; i < n; i++) {
+        const b = put(g, new THREE.BoxGeometry(Math.min(R(0.2, 0.26), slotW * 0.9), 0.03, Math.min(R(0.15, 0.19), usableD * 0.9)), mat(pick(tones), 0.7), 0, 0.015 + i * 0.031, 0);
+        b.rotation.y = R(-0.15, 0.15);
+      }
+    },
+    jars: (cx) => {
+      const n = Math.max(1, Math.min(3, Math.floor(slotW / 0.115)));
+      const lid = mat(pick([0x2b2b2b, 0x8a6a45, 0xa9a9a9]), 0.5);
+      for (let i = 0; i < n; i++) {
+        const r = R(0.038, 0.05),
+          h = Math.min(R(0.12, 0.18), clear - 0.05);
+        const x = cx + (i - (n - 1) / 2) * 0.112;
+        const z = R(-0.03, 0.03);
+        put(group, new THREE.CylinderGeometry(r, r, h, 18), mat(pick([0xb9c7c2, 0xc2ad8c, 0x9fb3a5, 0xd0c9bb]), 0.25), x, yTop + h / 2, z);
+        put(group, new THREE.CylinderGeometry(r * 1.03, r * 1.03, 0.02, 18), lid, x, yTop + h + 0.01, z);
+      }
+    },
+    plant: (cx) => {
+      const g = sub(cx, yTop, R(-0.03, 0.03));
+      put(g, new THREE.CylinderGeometry(0.07, 0.055, 0.11, 18), mat(pick([0xa35d3d, 0xd3cec4, 0x3d3d3d])), 0, 0.055, 0);
+      const greens = [0x3f6b3a, 0x4f7d45, 0x2f5a33];
+      const top = Math.min(0.3, clear - 0.08);
+      for (let i = 0; i < 7; i++) {
+        const a = rng() * Math.PI * 2,
+          rr = R(0, 0.07);
+        put(g, new THREE.IcosahedronGeometry(R(0.05, 0.08), 1), mat(pick(greens), 0.9), Math.cos(a) * rr, 0.13 + rng() * (top - 0.08), Math.sin(a) * rr);
+      }
+    },
+    towels: (cx) => {
+      const tones = [0xdedad2, 0xb9c4b4, 0xd9b9b3, 0x8f9aa8];
+      const n = Math.max(1, Math.min(4, Math.floor((clear - 0.02) / 0.05)));
+      const g = sub(cx, yTop, 0, R(-0.08, 0.08));
+      for (let i = 0; i < n; i++)
+        put(g, new THREE.BoxGeometry(Math.min(slotW * 0.8, 0.3), 0.045, Math.min(usableD * 0.8, 0.2)), mat(pick(tones), 1), R(-0.008, 0.008), 0.0225 + i * 0.047, R(-0.008, 0.008));
+    },
+    suitcase: (cx) => {
+      const g = sub(cx, yTop, 0, R(-0.06, 0.06));
+      const shell = mat(pick([0x1f3d36, 0x2b2f3a, 0x55585c]), 0.5);
+      put(g, new THREE.BoxGeometry(0.4, 0.56, 0.24), shell, 0, 0.31, 0);
+      put(g, new THREE.BoxGeometry(0.14, 0.025, 0.02), mat(0x1a1a1a), 0, 0.605, 0);
+      [-0.15, 0.15].forEach((x) =>
+        [-0.08, 0.08].forEach((z) =>
+          put(g, new THREE.CylinderGeometry(0.016, 0.016, 0.03, 10), mat(0x111111), x, 0.015, z)
+        )
+      );
+    },
+  };
+
+  for (let k = 0; k < slots; k++) {
+    const roll = rng(); // drawn every time so later slots stay stable
+    if (roll < 0.12) continue; // leave a gap now and then
+    const cx = -usableW / 2 + slotW * (k + 0.5);
+    const options = [['box', 3], ['basket', 2], ['towels', 1.5], ['booksFlat', 1]];
+    if (clear >= 0.22) options.push(['jars', 2]);
+    if (clear >= 0.3) options.push(['booksUp', 2.5]);
+    if (clear >= 0.42) options.push(['plant', 1.5]);
+    if (clear >= 0.64 && slotW >= 0.44 && usableD >= 0.26) options.push(['suitcase', 2]);
+    let total = 0;
+    options.forEach((o) => (total += o[1]));
+    let t = rng() * total;
+    let chosen = options[0][0];
+    for (const o of options) {
+      t -= o[1];
+      if (t <= 0) {
+        chosen = o[0];
+        break;
+      }
+    }
+    makers[chosen](cx);
+  }
+}
+
+/* Clothes on the hanger bar: a wooden hanger and a garment for each,
+   hanging across the depth of the rack. maxLen keeps them clear of
+   whatever is on the level below.                                    */
+function addHangingClothes(group, w, d, rodY, maxLen, seed) {
+  const { rng, R, pick, mat, put, sub } = displayKit(group, seed);
+  if (maxLen < 0.3) return;
+  const tones = [0x9c2a2a, 0x6d6a64, 0x232a3a, 0x1c1c1c, 0xcfcac0, 0xb98a8f, 0x4b5a4a];
+  const wood = mat(0x8a6a45, 0.6);
+  const steel = mat(0xcfd3d7, 0.3);
+  const n = 4 + Math.floor(rng() * 4);
+  let x = R(-w / 2 + 0.12, -w / 2 + 0.3);
+  for (let i = 0; i < n && x < w / 2 - 0.12; i++) {
+    const gw = Math.min(d - 0.12, R(0.34, 0.42));
+    const len = maxLen * R(0.55, 1);
+    const thick = R(0.025, 0.045);
+    const g = sub(x, rodY, 0, R(-0.1, 0.1));
+    put(g, new THREE.CylinderGeometry(0.003, 0.003, 0.05, 6), steel, 0, -0.012, 0);
+    put(g, new THREE.BoxGeometry(0.012, 0.016, gw), wood, 0, -0.045, 0);
+    const cloth = mat(pick(tones), 1);
+    put(g, new THREE.BoxGeometry(thick, 0.06, gw * 0.55), cloth, 0, -0.07, 0); // collar
+    put(g, new THREE.BoxGeometry(thick, len, gw), cloth, 0, -0.09 - len / 2, 0);
+    x += R(0.07, 0.11);
+  }
 }
 
 /* HOMEDANT HOUSE hanger bar: a bright steel tube running the width of
@@ -1896,6 +2147,17 @@ function addHHHangerBar(group, w, d, frameMat, tiers) {
   const rodGeo = new THREE.CylinderGeometry(0.0125, 0.0125, len - 0.02, 20);
   rodGeo.rotateZ(Math.PI / 2);
   hhAdd(group, rodGeo, steel, 0, y, 0);
+  if (hh.product.showItems) {
+    const below = lv.length > 1 ? lv[lv.length - 2].h * MM_TO_M : 0;
+    addHangingClothes(
+      group,
+      w,
+      d,
+      y,
+      Math.min(1.05, (y - below) * 0.62),
+      hashSeed(hh.product.instanceId || 'item') + 31
+    );
+  }
   const cupGeo = new THREE.CylinderGeometry(0.019, 0.019, 0.014, 20);
   cupGeo.rotateZ(Math.PI / 2);
   [-1, 1].forEach((s) => {
@@ -2008,6 +2270,7 @@ function buildGarmentRack(group, p, tpl) {
     house: tpl.brand === 'HOMEDANT HOUSE',
   });
   addPosts(group, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
+  if (mats.frame.userData.hh) mats.frame.userData.hh.garment = true;
   // tier boards (1-2 typically)
   addTierBoards(group, w, d, h, p.tier || tpl.defaultTier, mats.board, {
     frameMat: mats.frame,
@@ -2453,27 +2716,147 @@ function buildHeavy(group, p, tpl) {
   addPostFeet(group, w, d, mats.foot, 0.04);
 }
 
+/* Roll-up banner graphic, drawn once on a canvas: headline, a dotted
+   world map, the HOMEDANT wordmark. The wordmark is an image, so it is
+   painted in when it has loaded and the texture refreshed.            */
+let _bannerTex = null;
+function makeBannerTexture() {
+  if (_bannerTex) return _bannerTex;
+  const W = 512,
+    H = 1280;
+  const cv = document.createElement('canvas');
+  cv.width = W;
+  cv.height = H;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = '800 84px Arial, Helvetica, sans-serif';
+  ctx.fillStyle = '#c62828';
+  ctx.fillText('TRUSTED', 40, 190);
+  ctx.fillStyle = '#1c1c1c';
+  ctx.font = '800 70px Arial, Helvetica, sans-serif';
+  ctx.fillText('WORLDWIDE', 40, 268);
+  ctx.fillStyle = '#555555';
+  ctx.font = '400 34px Arial, Helvetica, sans-serif';
+  ctx.fillText('in Storage Solution', 40, 322);
+  // dotted world map: rough continent blobs filled with a dot grid
+  const blobs = [
+    [0.2, 0.33, 0.17, 0.22],
+    [0.29, 0.76, 0.07, 0.2],
+    [0.5, 0.27, 0.07, 0.13],
+    [0.53, 0.6, 0.09, 0.22],
+    [0.73, 0.33, 0.2, 0.2],
+    [0.86, 0.8, 0.07, 0.08],
+  ];
+  const mx = 40,
+    my = 420,
+    mw = 432,
+    mh = 250;
+  ctx.fillStyle = '#b9bdc3';
+  for (let y = 0; y <= mh; y += 10)
+    for (let x = 0; x <= mw; x += 10) {
+      const u = x / mw,
+        v = y / mh;
+      if (blobs.some(([cx, cy, rx, ry]) => ((u - cx) / rx) ** 2 + ((v - cy) / ry) ** 2 <= 1)) {
+        ctx.beginPath();
+        ctx.arc(mx + x, my + y, 2.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  ctx.fillStyle = '#c62828';
+  [
+    [0.2, 0.36],
+    [0.5, 0.28],
+    [0.74, 0.4],
+    [0.8, 0.3],
+    [0.86, 0.8],
+  ].forEach(([u, v]) => {
+    ctx.beginPath();
+    ctx.arc(mx + u * mw, my + v * mh, 7, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.fillRect(0, H - 46, W, 46); // red foot band
+  const tex = new THREE.CanvasTexture(cv);
+  tex.anisotropy = 8;
+  const img = new Image();
+  img.onload = () => {
+    const lw = 360,
+      lh = lw / HOMEDANT_WORDMARK_ASPECT;
+    ctx.drawImage(img, (W - lw) / 2, 1080, lw, lh);
+    tex.needsUpdate = true;
+    _bannerClones.forEach((c) => {
+      c.needsUpdate = true;
+    });
+    _bannerClones.clear();
+    _bannerReady = true;
+  };
+  img.src = HOMEDANT_WORDMARK_URL;
+  _bannerTex = tex;
+  return tex;
+}
+let _bannerReady = false;
+const _bannerClones = new Set();
+
 function buildBanner(group, p) {
   const w = p.width * MM_TO_M,
-    h = p.height * MM_TO_M;
-  // base
-  const baseGeo = new THREE.BoxGeometry(w, 0.04, p.depth * MM_TO_M);
-  const baseMat = new THREE.MeshStandardMaterial({
-    color: 0x444444,
-    roughness: 0.6,
+    h = p.height * MM_TO_M,
+    d = p.depth * MM_TO_M;
+  const metal = new THREE.MeshStandardMaterial({
+    color: 0x8d9197,
+    metalness: 0.3,
+    roughness: 0.4,
   });
-  const base = new THREE.Mesh(baseGeo, baseMat);
-  base.position.set(0, 0.02, 0);
-  group.add(base);
-  // banner panel
-  const bGeo = new THREE.BoxGeometry(w, h - 0.04, 0.01);
-  const bMat = new THREE.MeshStandardMaterial({
-    color: 0xd64545,
-    roughness: 0.7,
-  });
-  const banner = new THREE.Mesh(bGeo, bMat);
-  banner.position.set(0, (h - 0.04) / 2 + 0.04, 0);
-  group.add(banner);
+  const add = (geo, m, x, y, z) => {
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    group.add(mesh);
+    return mesh;
+  };
+  // cassette on the floor with two swing-out feet, and the rear pole
+  add(new THREE.BoxGeometry(w, 0.07, 0.09), metal, 0, 0.045, 0);
+  [-w / 2 + 0.08, w / 2 - 0.08].forEach((x) =>
+    add(new THREE.BoxGeometry(0.035, 0.012, Math.max(0.2, d)), metal, x, 0.006, 0)
+  );
+  add(new THREE.CylinderGeometry(0.008, 0.008, h - 0.05, 8), metal, 0, h / 2 + 0.02, -0.025);
+  add(new THREE.BoxGeometry(w, 0.025, 0.018), metal, 0, h - 0.0125, 0);
+  // printed panel: graphic on the front, plain white behind
+  const tex = makeBannerTexture().clone();
+  tex.needsUpdate = true;
+  if (!_bannerReady) _bannerClones.add(tex);
+  const front = new THREE.MeshStandardMaterial({ map: tex, color: 0xdddddd, roughness: 0.8 });
+  const plain = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.8 });
+  const ph = h - 0.105;
+  add(
+    new THREE.BoxGeometry(w * 0.98, ph, 0.003),
+    [plain, plain, plain, plain, front, plain],
+    0,
+    0.08 + ph / 2,
+    0.004
+  );
+}
+
+/* Table dressed in a blush cloth to the floor with the logo on the front */
+function buildLogoTable(group, p) {
+  const w = p.width * MM_TO_M,
+    h = p.height * MM_TO_M,
+    d = p.depth * MM_TO_M;
+  const cloth = new THREE.MeshStandardMaterial({ color: 0xcdb3ad, roughness: 1 });
+  const clothTop = new THREE.MeshStandardMaterial({ color: 0xa8928d, roughness: 1 });
+  const skirt = new THREE.Mesh(new THREE.BoxGeometry(w, h - 0.01, d), cloth);
+  skirt.position.set(0, (h - 0.01) / 2, 0);
+  skirt.castShadow = true;
+  skirt.receiveShadow = true;
+  group.add(skirt);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(w + 0.006, 0.012, d + 0.006), clothTop);
+  top.position.set(0, h - 0.006, 0);
+  top.castShadow = true;
+  top.receiveShadow = true;
+  group.add(top);
+  const sign = makeLogoSign(Math.min(w * 0.5, 0.8));
+  sign.position.set(0, h * 0.52, d / 2 + 0.002);
+  group.add(sign);
 }
 
 function buildPoster(group, p) {
@@ -2665,6 +3048,9 @@ function buildProductMesh(p, tpl) {
     case 'poster':
       buildPoster(group, p);
       break;
+    case 'logo_table':
+      buildLogoTable(group, p);
+      break;
     case 'table':
       buildTable(group, p);
       break;
@@ -2689,12 +3075,12 @@ function buildProductMesh(p, tpl) {
 export default function BoothSimulator() {
   // ----- state -----
   const [booth, setBooth] = useState({
-    width: 6096, // 20ft in mm  (10ft x 20ft default)
+    width: 3048, // 10ft in mm  (10ft x 10ft default)
     depth: 3048, // 10ft in mm
     wallHeight: 2438, // 8ft in mm
     unit: 'ft',
     style: 'wall', // 'wall' = solid panel booth, 'curtain' = curtain booth
-    look: 'plan', // see BOOTH_LOOKS
+    look: DEFAULT_LOOK, // see BOOTH_LOOKS
   });
   const [lang, setLangState] = useState(loadLang);
   _lang = lang; // read by tr() everywhere below
@@ -2863,7 +3249,7 @@ export default function BoothSimulator() {
         });
       }
     }
-    const look = BOOTH_LOOKS[booth.look] || BOOTH_LOOKS.plan;
+    const look = BOOTH_LOOKS[booth.look] || BOOTH_LOOKS[DEFAULT_LOOK];
     if (sceneRef.current) sceneRef.current.background = new THREE.Color(look.background);
     const w = booth.width * MM_TO_M;
     const d = booth.depth * MM_TO_M;
@@ -3133,7 +3519,7 @@ export default function BoothSimulator() {
         Array.isArray(p.levels)
           ? p.levels.map((l) => `${l.h}${l.style}`).join('.')
           : ''
-      }`;
+      }-${p.showItems ? 'items' : ''}`;
       if (!mesh || mesh.userData.fingerprint !== fingerprint) {
         if (mesh) {
           group.remove(mesh);
@@ -3234,7 +3620,8 @@ export default function BoothSimulator() {
   /* ---------- view mode handler ---------- */
   useEffect(() => {
     if (!controlsRef.current) return;
-    const dist = Math.max(booth.width, booth.depth) * MM_TO_M * 1.2;
+    // far enough back to see the whole booth, including a small 10x10
+    const dist = Math.max(booth.width, booth.depth) * MM_TO_M + 3;
     controlsRef.current.setView(viewMode, dist);
   }, [viewMode, booth.width, booth.depth]);
 
@@ -3692,12 +4079,12 @@ export default function BoothSimulator() {
     setCurrentDesignId(null); // fresh layout — next save creates a new entry
     // reset booth to the default size/style but keep the current unit
     setBooth((b) => ({
-      width: 6096,
+      width: 3048,
       depth: 3048,
       wallHeight: 2438,
       unit: b.unit,
       style: 'wall',
-      look: b.look || 'plan',
+      look: b.look || DEFAULT_LOOK,
     }));
   };
 
@@ -3850,7 +4237,7 @@ export default function BoothSimulator() {
                 onClick={() => setBoothLook(key)}
                 className={
                   'text-xs px-2 py-1 rounded border transition ' +
-                  ((booth.look || 'plan') === key
+                  ((booth.look || DEFAULT_LOOK) === key
                     ? 'bg-gray-900 text-white border-gray-900'
                     : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
                 }
@@ -4483,6 +4870,26 @@ function PropertyPanel({
         )}
       </Section>
 
+      {tpl.brand === 'HOMEDANT HOUSE' && HH_ITEM_TYPES.includes(tpl.type) && (
+        <Section title={tr('Display items')}>
+          <div className="flex gap-1.5">
+            {[false, true].map((on) => (
+              <button
+                key={String(on)}
+                onClick={() => update({ showItems: on })}
+                className={`flex-1 text-xs py-1.5 rounded border transition ${
+                  !!product.showItems === on
+                    ? 'border-gray-900 bg-gray-900 text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {tr(on ? 'on' : 'off')}
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {tpl.brand === 'HOMEDANT HOUSE' && HH_LEVEL_TYPES.includes(tpl.type) && (
         <HHLevelEditor product={product} tpl={tpl} update={update} />
       )}
@@ -4956,7 +5363,7 @@ function ProductThumb({ type, tpl, product }) {
       </svg>
     );
   }
-  if (type === 'table') {
+  if (type === 'table' || type === 'logo_table') {
     return (
       <svg
         viewBox="0 0 24 24"
