@@ -1089,6 +1089,13 @@ const KO = {
   "Towels": "수건",
   "Soccer ball": "축구공",
   "Suitcase": "캐리어",
+  "Picture frame": "액자",
+  "Fruit bowl": "과일 그릇",
+  "Canned food": "캔 식품",
+  "Snack boxes": "과자 박스",
+  "Floor": "바닥",
+  "Washing machine": "세탁기",
+  "The washing machine does not fit. Use a width of 700 or more and raise level 2.": "세탁기가 들어가지 않습니다. 폭을 700 이상으로 하고 2단을 올려주세요.",
   "Choose an item for each spot, left to right. Level 1 is the lowest.": "칸마다 놓을 물건을 고르세요. 왼쪽부터 순서대로이고, 1번이 가장 아랫단입니다.",
   "Reset to auto": "자동으로 되돌리기",
   "off": "끔",
@@ -1939,6 +1946,8 @@ function buildShelf(group, p, tpl) {
     skipBottom,
     frameMat: mats.frame,
   });
+  if (skipBottom && mats.frame.userData.hh && p.showItems && p.baseItem === 'washer')
+    addWasher(group, w, d, hhOpenBaseRoom(p, hhResolveLevels(p, p.tier || tpl.defaultTier)));
   addPostFeet(group, w, d, mats.foot, 0.025);
 }
 
@@ -1998,6 +2007,7 @@ function displayKit(group, seed) {
    standing on y = 0. Instances are clones that share the cached geometry
    and materials, marked sharedAsset so product clean-up leaves them be. */
 const PROP_MODELS = {};
+const FRAME_TURN = -Math.PI / 2; // the frame models face along x
 let _propLoad = null;
 function loadPropModels() {
   if (_propLoad) return _propLoad;
@@ -2031,6 +2041,10 @@ function loadPropModels() {
                   o.castShadow = true;
                   o.receiveShadow = true;
                   const m = o.material;
+                  if (m.transparent) {
+                    o.visible = false; // glass pane: reads as a grey film here
+                    return;
+                  }
                   if (m.map) {
                     // this app does not colour-manage, so use the texture
                     // values as they are, like every other texture here
@@ -2085,7 +2099,151 @@ const DISPLAY_ITEMS = [
   ['towels', 'Towels', 0.08],
   ['ball', 'Soccer ball', 0.24],
   ['suitcase', 'Suitcase', 0.64],
+  ['frame', 'Picture frame', 0.29],
+  ['fruit', 'Fruit bowl', 0.2],
+  ['cans', 'Canned food', 0.14],
+  ['snacks', 'Snack boxes', 0.28],
 ];
+
+/* Printed faces for the cans and snack boxes: made-up generic packaging,
+   drawn once and shared by every item that uses it.                    */
+const _labelTex = {};
+function labelTexture(key, w, h, draw) {
+  if (_labelTex[key]) return _labelTex[key];
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  _labelTex[key] = t;
+  return t;
+}
+// name, label colour, band colour, picture colour
+const CAN_KINDS = [
+  ['TOMATO', '#a63628', '#eadfc8', '#c6452f'],
+  ['SWEET CORN', '#2f6238', '#efe5c4', '#dcb236'],
+  ['TUNA', '#1f4a72', '#e2e8ea', '#86a8c2'],
+  ['BEANS', '#6f381d', '#ecdfc8', '#9a5230'],
+  ['PEACH', '#cf8228', '#f3e7d1', '#eb9c3a'],
+];
+function canLabel(kind) {
+  const [name, bg, band, pic] = kind;
+  return labelTexture('can' + name, 512, 160, (x, w, h) => {
+    x.fillStyle = bg;
+    x.fillRect(0, 0, w, h);
+    x.fillStyle = band;
+    x.fillRect(0, h * 0.2, w, h * 0.6);
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    // the same face twice, on opposite sides of the can
+    [0.25, 0.75].forEach((u) => {
+      x.fillStyle = pic;
+      x.beginPath();
+      x.arc(w * u, h * 0.4, h * 0.15, 0, Math.PI * 2);
+      x.fill();
+      x.fillStyle = bg;
+      x.font = `bold ${name.length > 6 ? 21 : 26}px Arial, sans-serif`;
+      x.fillText(name, w * u, h * 0.68);
+    });
+  });
+}
+// name, box colour, accent colour
+const SNACK_KINDS = [
+  ['CRACKERS', '#b8402c', '#f1dfbc'],
+  ['COOKIES', '#2c4a80', '#eed5a2'],
+  ['GRANOLA', '#547636', '#f0e6cd'],
+  ['CHIPS', '#d59a22', '#fbf1d6'],
+  ['CEREAL', '#70458f', '#f3dfa2'],
+];
+function snackFace(kind) {
+  const [name, bg, accent] = kind;
+  return labelTexture('snack' + name, 256, 352, (x, w, h) => {
+    x.fillStyle = bg;
+    x.fillRect(0, 0, w, h);
+    x.fillStyle = accent;
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.font = 'bold 40px Arial, sans-serif';
+    x.fillText(name, w / 2, h * 0.17, w * 0.86);
+    x.fillRect(w * 0.2, h * 0.27, w * 0.6, 4);
+    // a plate of the snack
+    x.beginPath();
+    x.arc(w / 2, h * 0.63, w * 0.34, 0, Math.PI * 2);
+    x.fill();
+    x.fillStyle = bg;
+    x.globalAlpha = 0.55;
+    [[-0.13, -0.08], [0.1, -0.12], [-0.02, 0.06], [0.15, 0.08], [-0.16, 0.12]].forEach(([dx, dy]) => {
+      x.beginPath();
+      x.arc(w * (0.5 + dx), h * 0.63 + w * dy, w * 0.085, 0, Math.PI * 2);
+      x.fill();
+    });
+    x.globalAlpha = 1;
+  });
+}
+
+/* A front-loading washing machine (600 x 850 x 600) for the open space
+   at the bottom of an Open Base shelf. maxH = free height under the
+   lowest level. Left out if it would have to shrink noticeably.       */
+const WASHER = { w: 0.6, h: 0.85, d: 0.6 };
+function washerScale(w, maxH) {
+  return Math.min(1, (maxH - 0.01) / WASHER.h, (w - 0.09) / WASHER.w);
+}
+function addWasher(group, w, d, maxH) {
+  const s = washerScale(w, maxH);
+  if (s < 0.85) return false;
+  const { mat, put } = displayKit(group, 1);
+  const W = WASHER.w,
+    H = WASHER.h,
+    D = WASHER.d;
+  const g = new THREE.Group();
+  g.scale.setScalar(s);
+  // a shelf shallower than the machine: backs in line, machine out front
+  g.position.z = d >= D * s ? 0 : -d / 2 + (D * s) / 2;
+  group.add(g);
+  const white = mat(0xd6d6d3, 0.35);
+  const grey = mat(0xa9acae, 0.35);
+  const dark = mat(0x16191c, 0.25);
+  const f = D / 2; // front face
+  const lie = (m) => {
+    m.rotation.x = Math.PI / 2;
+    return m;
+  };
+  [-1, 1].forEach((sx) =>
+    [-1, 1].forEach((sz) =>
+      put(g, new THREE.CylinderGeometry(0.02, 0.02, 0.016, 12), dark, sx * (W / 2 - 0.05), 0.008, sz * (D / 2 - 0.05))
+    )
+  );
+  put(g, new THREE.BoxGeometry(W, H - 0.016, D), white, 0, 0.016 + (H - 0.016) / 2, 0);
+  // control panel across the top of the front
+  const py = H - 0.07;
+  put(g, new THREE.BoxGeometry(W - 0.012, 0.105, 0.008), grey, 0, py, f + 0.003);
+  put(g, new THREE.BoxGeometry(0.17, 0.075, 0.006), white, -W / 2 + 0.11, py, f + 0.008); // detergent drawer
+  put(g, new THREE.BoxGeometry(0.11, 0.012, 0.004), grey, -W / 2 + 0.11, py - 0.022, f + 0.012);
+  lie(put(g, new THREE.CylinderGeometry(0.034, 0.034, 0.022, 24), white, 0.03, py, f + 0.016)); // dial
+  lie(put(g, new THREE.CylinderGeometry(0.02, 0.02, 0.026, 20), grey, 0.03, py, f + 0.018));
+  put(g, new THREE.BoxGeometry(0.13, 0.042, 0.004), dark, 0.19, py + 0.008, f + 0.008); // display
+  [0.145, 0.175, 0.205, 0.235].forEach((bx) =>
+    lie(put(g, new THREE.CylinderGeometry(0.007, 0.007, 0.006, 10), white, bx, py - 0.032, f + 0.008))
+  );
+  // door: white surround, grey ring, dark domed glass
+  const dy = 0.4;
+  put(g, new THREE.TorusGeometry(0.212, 0.016, 10, 44), white, 0, dy, f + 0.004);
+  put(g, new THREE.TorusGeometry(0.18, 0.03, 12, 44), grey, 0, dy, f + 0.016);
+  const glass = put(g, new THREE.SphereGeometry(0.158, 28, 16), dark, 0, dy, f + 0.006);
+  glass.scale.z = 0.28;
+  put(g, new THREE.BoxGeometry(0.022, 0.1, 0.02), grey, -0.2, dy, f + 0.034); // handle
+  // plinth line and filter cover
+  put(g, new THREE.BoxGeometry(W - 0.012, 0.004, 0.004), grey, 0, 0.11, f + 0.002);
+  put(g, new THREE.BoxGeometry(0.08, 0.06, 0.004), grey, W / 2 - 0.09, 0.06, f + 0.002);
+  return true;
+}
+/* free height under the lowest level of an open base shelf, in metres */
+function hhOpenBaseRoom(p, levels) {
+  const L = levels[1];
+  if (!L) return 0;
+  return L.h * MM_TO_M - HH.beamH - (L.style === 'basket' ? 0 : 0.009);
+}
 const DISPLAY_NEED = Object.fromEntries(DISPLAY_ITEMS.map((d) => [d[0], d[2]]));
 /* how many item slots a level of this width has (w in metres) */
 function displaySlotCount(w, basket) {
@@ -2121,6 +2279,10 @@ function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0, picks = null
       if (clear >= 0.24) options.push(['ball', 0.7]);
       if (clear >= 0.3) options.push(['booksUp', 2.5]);
       if (clear >= 0.3) options.push(['vase', 1]);
+      if (clear >= 0.14) options.push(['cans', 1.2]);
+      if (clear >= 0.2) options.push(['fruit', 1]);
+      if (clear >= 0.28) options.push(['snacks', 1.2]);
+      if (clear >= 0.29) options.push(['frame', 0.8]);
       if (clear >= 0.42) options.push(['plant', 1.5]);
       if (clear >= 0.64 && slotW >= 0.44 && usableD >= 0.26) options.push(['suitcase', 2]);
       let total = 0;
@@ -2168,6 +2330,42 @@ function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0, picks = null
         placed = placePropModel(g, 'suitcase', slotW * 0.95, usableD * 0.95, room, R(-0.05, 0.05), 0.55);
       } else if (type === 'vase') {
         placed = placePropModel(g, rng() < 0.5 ? 'vase1' : 'vase2', slotW * 0.6, usableD * 0.7, Math.min(room, 0.4), yaw, 0.6);
+      } else if (type === 'frame' && PROP_MODELS.frame1 && PROP_MODELS.frame2) {
+        // one framed photo, or two side by side on a wide spot
+        const names = rng() < 0.5 ? ['frame1', 'frame2'] : ['frame2', 'frame1'];
+        const n = slotW >= 0.42 ? 2 : 1;
+        for (let i = 0; i < n; i++) {
+          const m = PROP_MODELS[names[i]];
+          const s = Math.min(1, room / m.size.y, (slotW * 0.9) / n / m.size.z) * (i ? 0.8 : 1);
+          if (s < 0.5) continue;
+          const obj = m.scene.clone(true);
+          obj.scale.setScalar(s);
+          obj.rotation.y = FRAME_TURN + R(-0.25, 0.25);
+          obj.position.set(n === 1 ? 0 : (i - 0.5) * slotW * 0.46, 0, i ? 0.03 : -0.02);
+          g.add(obj);
+          placed = true;
+        }
+      } else if (type === 'fruit' && PROP_MODELS.bowl && PROP_MODELS.apple) {
+        const bowl = PROP_MODELS.bowl;
+        const s = Math.min(1, (slotW * 0.92) / bowl.size.x, (usableD * 0.95) / bowl.size.z, room / 0.2);
+        if (s >= 0.55) {
+          const set = new THREE.Group();
+          set.scale.setScalar(s);
+          set.add(bowl.scene.clone(true));
+          const fruit = ['apple', 'pomegranate', 'lime', 'apple', 'avocado', 'lime'].filter((f) => PROP_MODELS[f]);
+          const a0 = R(0, 6);
+          fruit.forEach((name, i) => {
+            const obj = PROP_MODELS[name].scene.clone(true);
+            const a = a0 + (i / (fruit.length - 1)) * Math.PI * 2;
+            const rr = i === 0 ? 0 : 0.078;
+            obj.position.set(Math.cos(a) * rr, i === 0 ? 0.05 : 0.036, Math.sin(a) * rr);
+            obj.rotation.set(R(-0.5, 0.5), R(0, 6), R(-0.5, 0.5));
+            if (name === 'avocado') obj.rotation.z = 1.1;
+            set.add(obj);
+          });
+          g.add(set);
+          placed = true;
+        }
       } else if (type === 'booksUp' && PROP_MODELS.books) {
         // one or two runs of books side by side
         const bw = PROP_MODELS.books.size.x;
@@ -2296,6 +2494,56 @@ function addDisplayItems(group, w, d, yTop, clear, seed, inset = 0, picks = null
         const pent = put(ball, new THREE.SphereGeometry(r * 1.035, 5, 3, 0, Math.PI * 2, 0, 0.37), patch, 0, 0, 0);
         pent.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v);
         pent.castShadow = false;
+      }
+    } else if (type === 'cans') {
+      // tins in rows, one kind per column, some columns stacked two high
+      const r = 0.037,
+        h = 0.11,
+        step = 0.08;
+      const cols = Math.max(1, Math.min(4, Math.floor((sw * 0.94) / step)));
+      const rows = sd >= 0.2 ? 2 : 1;
+      const steel = mat(0xa7abae, 0.3);
+      for (let i = 0; i < cols; i++) {
+        const side = new THREE.MeshStandardMaterial({ map: canLabel(pick(CAN_KINDS)), color: 0xd0d0d0, roughness: 0.5, metalness: 0 });
+        const high = c >= 2 * h + 0.03 && rng() < 0.55 ? 2 : 1;
+        for (let j = 0; j < rows; j++)
+          for (let k = 0; k < (j === 0 && rows > 1 ? 1 : high); k++) {
+            const can = put(g, new THREE.CylinderGeometry(r, r, h, 24), [side, steel, steel], (i - (cols - 1) / 2) * step, h / 2 + k * (h + 0.002), (rows > 1 ? (j ? -0.045 : 0.04) : 0) + R(-0.004, 0.004));
+            can.rotation.y = Math.PI / 2 + R(-0.35, 0.35);
+            [0, h].forEach((y) => put(g, new THREE.CylinderGeometry(r + 0.0015, r + 0.0015, 0.004, 24), steel, can.position.x, can.position.y - h / 2 + y, can.position.z));
+          }
+      }
+    } else if (type === 'snacks') {
+      // upright cartons facing the front, a second one behind each
+      const bw = 0.17,
+        bd = 0.055,
+        bh = Math.min(0.25, c - 0.02);
+      const n = Math.max(1, Math.min(3, Math.floor((sw * 0.96) / (bw + 0.012))));
+      for (let i = 0; i < n; i++) {
+        const kind = pick(SNACK_KINDS);
+        const face = new THREE.MeshStandardMaterial({ map: snackFace(kind), color: 0xcfcfcf, roughness: 0.7, metalness: 0 });
+        const plain = mat(new THREE.Color(kind[1]).multiplyScalar(0.8).getHex(), 0.7);
+        const deep = sd >= 0.17 ? 2 : 1;
+        for (let j = 0; j < deep; j++) {
+          const box = put(g, new THREE.BoxGeometry(bw, bh, bd), [plain, plain, plain, plain, face, face], (i - (n - 1) / 2) * (bw + 0.012), bh / 2, (deep > 1 ? 0.035 - j * (bd + 0.006) : 0));
+          box.rotation.y = j ? 0 : R(-0.07, 0.07);
+        }
+      }
+    } else if (type === 'frame') {
+      const fh = Math.min(0.25, c - 0.03),
+        fw = fh * 0.78;
+      const lean = new THREE.Group();
+      lean.rotation.set(-0.16, R(-0.2, 0.2), 0);
+      g.add(lean);
+      put(lean, new THREE.BoxGeometry(fw, fh, 0.014), mat(pick([0x1c1c1c, 0xc9c6bf, 0x7a5a3c]), 0.5), 0, fh / 2, 0);
+      put(lean, new THREE.BoxGeometry(fw * 0.8, fh * 0.84, 0.002), mat(pick([0x9fb0b8, 0xb9ad98, 0x8d9a8a]), 0.9), 0, fh / 2, 0.008);
+    } else if (type === 'fruit') {
+      const r = Math.min(0.15, Math.min(sw, sd) * 0.46);
+      put(g, new THREE.CylinderGeometry(r, r * 0.55, 0.08, 24), mat(0x7d5a3a, 0.7), 0, 0.04, 0);
+      const tones = [0xa8332b, 0x7c9a3a, 0xc9892b, 0x9c2f3a, 0x6d8a35];
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + R(0, 1);
+        put(g, new THREE.SphereGeometry(r * 0.3, 14, 10), mat(tones[i], 0.6), Math.cos(a) * r * 0.45, 0.09, Math.sin(a) * r * 0.45);
       }
     } else if (type === 'suitcase') {
       g.rotation.y = R(-0.06, 0.06);
@@ -3745,7 +3993,7 @@ export default function BoothSimulator() {
           : ''
       }-${
         p.showItems
-          ? `items${propsReady ? 'R' : ''}${JSON.stringify(p.itemPicks || '')}`
+          ? `items${propsReady ? 'R' : ''}${JSON.stringify(p.itemPicks || '')}${p.baseItem || ''}`
           : ''
       }`;
       if (!mesh || mesh.userData.fingerprint !== fingerprint) {
@@ -4917,9 +5165,6 @@ function PropertyPanel({
   const zMin = (-boothSize.d * MM_TO_M) / 2;
   const zMax = (boothSize.d * MM_TO_M) / 2;
 
-  // Look up a rendering image for the right-side preview. May be null.
-  const refImg = findRenderImage(product, tpl);
-
   return (
     <div className="flex-1 overflow-y-auto">
       {/* header */}
@@ -4943,56 +5188,6 @@ function PropertyPanel({
               {tr(WARNING_REASON_SHORT[warning] || 'Review')}
             </span>
           )}
-        </div>
-      </div>
-
-      {/* reference image preview (rendering image vs current setting) */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <div
-          className="w-full h-32 rounded border border-gray-200 flex items-center justify-center overflow-hidden mb-2"
-          style={{ backgroundColor: '#ffffff' }}
-        >
-          {refImg && refImg.url ? (
-            <img
-              src={refImg.url}
-              alt={tpl.name}
-              className="max-h-full max-w-full object-contain"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
-          ) : (
-            <div className="text-center px-2">
-              <ProductThumb type={tpl.type} />
-              <div className="text-xs text-gray-400 mt-1">
-                {tr('No reference image')}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="text-xs space-y-0.5 leading-tight">
-          {refImg ? (
-            <div className="text-gray-500">
-              <span className="text-gray-400">{tr('Reference image: ')}</span>
-              {refImg.width && refImg.depth && refImg.height
-                ? `${refImg.width}×${refImg.depth}×${refImg.height}`
-                : '—'}
-              {refImg.tier ? ` / ${refImg.tier}-Tier` : ''}
-              {refImg.color ? ` / ${refImg.color}` : ''}
-            </div>
-          ) : (
-            <div className="text-gray-400">
-              {tr('Reference image: not available')}
-            </div>
-          )}
-          <div className="text-gray-900 font-medium">
-            <span className="text-gray-400 font-normal">
-              {tr('Current setting: ')}
-            </span>
-            {product.width}×{product.depth}×{product.height}
-            {product.tier ? ` / ${product.tier}${tr('-Tier')}` : ''}
-            {product.frameColor ? ` / ${tr(product.frameColor)}` : ''}
-          </div>
         </div>
       </div>
 
@@ -5296,6 +5491,32 @@ function HHItemEditor({ product, tpl, update }) {
     row[k] = value;
     update({ itemPicks: { ...picks, [i]: row } });
   };
+  // Open Base: what stands in the open space on the floor. Picking the
+  // washing machine lifts the levels above it when they are too low.
+  const setBase = (value) => {
+    const patch = { baseItem: value === 'none' ? undefined : value };
+    const n = levels.length;
+    const need =
+      HH_LEVEL_MIN +
+      Math.ceil((WASHER.h * 1000 + 10 + HH.beamH * 1000 + 9 - HH_LEVEL_MIN) / HH_LEVEL_STEP) * HH_LEVEL_STEP;
+    if (value === 'washer' && n >= 3 && levels[1].h < need && product.height - need >= (n - 2) * HH_LEVEL_GAP) {
+      const span = product.height - need;
+      const next = levels.map((l, i) =>
+        i === 0
+          ? l
+          : i === n - 1
+          ? { ...l, h: product.height }
+          : { ...l, h: need + Math.round((((i - 1) / (n - 2)) * span) / HH_LEVEL_STEP) * HH_LEVEL_STEP }
+      );
+      for (let i = n - 2; i >= 1; i--) next[i].h = Math.min(next[i].h, next[i + 1].h - HH_LEVEL_GAP);
+      patch.levels = next;
+      patch.levelsKey = hhLevelKey(product);
+    }
+    update(patch);
+  };
+  const washerOut =
+    product.baseItem === 'washer' &&
+    washerScale(product.width * MM_TO_M, hhOpenBaseRoom(product, levels)) < 0.85;
   const rows = [];
   if (product.showItems) {
     for (let i = levels.length - 1; i >= first; i--) {
@@ -5346,6 +5567,24 @@ function HHItemEditor({ product, tpl, update }) {
             {tr('Choose an item for each spot, left to right. Level 1 is the lowest.')}
           </div>
           {rows}
+          {tpl.type === 'open_base' && (
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="flex-none text-xs text-gray-500">{tr('Floor')}</span>
+              <select
+                value={product.baseItem || 'none'}
+                onChange={(e) => setBase(e.target.value)}
+                className="flex-1 min-w-0 text-xs border border-gray-300 rounded px-1 py-1 bg-white"
+              >
+                <option value="none">{tr('None')}</option>
+                <option value="washer">{tr('Washing machine')}</option>
+              </select>
+            </div>
+          )}
+          {washerOut && (
+            <div className="text-xs text-amber-700 mb-1.5">
+              {tr('The washing machine does not fit. Use a width of 700 or more and raise level 2.')}
+            </div>
+          )}
           <button
             onClick={() => update({ itemPicks: undefined })}
             disabled={!product.itemPicks}
