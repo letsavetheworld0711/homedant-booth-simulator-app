@@ -1174,6 +1174,7 @@ const KO = {
   "Manager Lee": "이과장",
   "Staff": "직원",
   "Name tag": "이름표",
+  "Speech bubble": "말풍선",
   "Glasses": "안경",
   "Shirt": "상의",
   "Hair": "머리",
@@ -1308,6 +1309,76 @@ function makeLogoSign(width) {
    walk through the products, and they give a sense of human scale.
    Returns the group to add to the scene and a tick(dt) to call every
    frame.                                                              */
+/* A speech bubble that always faces the camera and draws on top, so it
+   is never hidden behind shelves. Returns a sprite about `width` metres
+   wide, its tail pointing down at y = 0.                               */
+function makeSpeechBubble(text, width = 0.9) {
+  const c = document.createElement('canvas');
+  const x = c.getContext('2d');
+  const font = 'bold 44px Arial, "Malgun Gothic", sans-serif';
+  x.font = font;
+  const tw = Math.min(900, Math.ceil(x.measureText(text).width));
+  c.width = tw + 80;
+  c.height = 150;
+  x.font = font;
+  const W = c.width,
+    bh = 104,
+    r = 30;
+  x.fillStyle = '#ffffff';
+  x.strokeStyle = '#2b2b2b';
+  x.lineWidth = 5;
+  x.beginPath();
+  x.moveTo(r + 3, 3);
+  x.arcTo(W - 3, 3, W - 3, bh, r);
+  x.arcTo(W - 3, bh, 3, bh, r);
+  x.lineTo(W / 2 + 22, bh);
+  x.lineTo(W / 2, 146);
+  x.lineTo(W / 2 - 10, bh);
+  x.arcTo(3, bh, 3, 3, r);
+  x.arcTo(3, 3, W - 3, 3, r);
+  x.closePath();
+  x.fill();
+  x.stroke();
+  x.fillStyle = '#1a1a1a';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.fillText(text, W / 2, bh / 2 + 2, W - 50);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true })
+  );
+  const w = Math.min(1.6, width * (W / 520));
+  sprite.scale.set(w, (w * c.height) / W, 1);
+  sprite.center.set(0.5, 0);
+  sprite.renderOrder = 999;
+  return sprite;
+}
+const VISITOR_LINES = [
+  'Hi, your items look great!',
+  'Love these shelves!',
+  'Is this all steel?',
+  'Can I see the catalog?',
+  'Wow, so sturdy!',
+];
+
+/* Clamp a product's position so its whole footprint stays inside the
+   booth (bw x bd in mm). Rotations are in 90 degree steps.           */
+function clampToBooth(p, bw, bd) {
+  const turned = Math.round((p.rotation || 0) / 90) % 2 === 1;
+  const hw = ((turned ? p.depth : p.width) * MM_TO_M) / 2;
+  const hd = ((turned ? p.width : p.depth) * MM_TO_M) / 2;
+  const lim = (v, h, half) => (half - h <= 0 ? 0 : Math.max(-half + h, Math.min(half - h, v)));
+  return {
+    x: lim(p.position.x, hw, (bw * MM_TO_M) / 2),
+    z: lim(p.position.z, hd, (bd * MM_TO_M) / 2),
+  };
+}
+const keepIn = (p, booth) => {
+  const c = clampToBooth(p, booth.width, booth.depth);
+  return c.x === p.position.x && c.z === p.position.z ? p : { ...p, position: c };
+};
+
 function createVisitors(w, d) {
   const group = new THREE.Group();
   const count = Math.max(4, Math.min(9, Math.round(w) + 2));
@@ -1357,8 +1428,13 @@ function createVisitors(w, d) {
     const armL = add(armGeo, top, -0.215, 1.41, 0);
     const armR = add(armGeo, top, 0.215, 1.41, 0);
     add(headGeo, skin, 0, 1.585, 0);
+    // what they say while stopped at the booth
+    const bubble = makeSpeechBubble(VISITOR_LINES[i % VISITOR_LINES.length], 0.8);
+    bubble.position.set(0, 1.78, 0);
+    bubble.visible = false;
+    g.add(bubble);
     g.scale.setScalar(rnd(0.92, 1.07)); // about 1.55 m to 1.8 m tall
-    const v = { g, legL, legR, armL, armR, phase: rnd(0, 6), yaw: 0, lane: i };
+    const v = { g, legL, legR, armL, armR, bubble, phase: rnd(0, 6), yaw: 0, lane: i };
     reset(v, true);
     v.yaw = v.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
     group.add(g);
@@ -1368,6 +1444,8 @@ function createVisitors(w, d) {
   const tick = (dt) => {
     for (const v of visitors) {
       let targetYaw;
+      // most visitors say something while they stop and look
+      v.bubble.visible = v.mode === 'look' && v.talk && v.wait > 0.6;
       if (v.mode === 'walk') {
         const before = v.x;
         v.x += v.dir * v.speed * dt;
@@ -1378,6 +1456,7 @@ function createVisitors(w, d) {
           (before - v.stopX) * (v.x - v.stopX) <= 0 // just reached the spot
         ) {
           v.mode = 'look';
+          v.talk = Math.random() < 0.7;
           v.wait = rnd(3, 8);
           v.stopX = null;
         }
@@ -4069,6 +4148,13 @@ function buildStaff(group, p, tpl) {
   x.fillStyle = '#111111';
   x.font = `bold ${name.length > 6 ? 46 : 64}px "Noto Sans KR", "Malgun Gothic", Arial, sans-serif`;
   x.fillText(name, 160, 124, 296);
+  // speech bubble above the head
+  const say = p.staffSay === undefined ? 'Hi, how are you?' : p.staffSay.trim();
+  if (say) {
+    const b = makeSpeechBubble(say, 0.9);
+    b.position.set(0, 1.98, 0);
+    g.add(b);
+  }
   const tagTex = new THREE.CanvasTexture(c);
   tagTex.anisotropy = 4;
   const tag = coat
@@ -4636,7 +4722,7 @@ export default function BoothSimulator() {
         Array.isArray(p.levels)
           ? p.levels.map((l) => `${l.h}${l.style}`).join('.')
           : ''
-      }-${p.hangers || ''}-${p.staffName || ''}${p.staffGlasses ? 'G' : ''}${p.staffHair || ''}${p.staffShirt || ''}-${
+      }-${p.hangers || ''}-${p.staffName || ''}|${p.staffSay ?? ''}|${p.staffGlasses ? 'G' : ''}${p.staffHair || ''}${p.staffShirt || ''}-${
         p.showItems
           ? `items${propsReady ? 'R' : ''}${JSON.stringify(p.itemPicks || '')}${p.baseItem || ''}`
           : ''
@@ -4814,8 +4900,14 @@ export default function BoothSimulator() {
     drag.moved = true;
     const floorPt = getFloorPoint(e);
     if (!floorPt) return;
-    const newX = floorPt.x + drag.offsetX;
-    const newZ = floorPt.z + drag.offsetZ;
+    let newX = floorPt.x + drag.offsetX;
+    let newZ = floorPt.z + drag.offsetZ;
+    const dragged = productsRef.current.find((p) => p.instanceId === drag.instanceId);
+    if (dragged) {
+      const c = clampToBooth({ ...dragged, position: { x: newX, z: newZ } }, booth.width, booth.depth);
+      newX = c.x;
+      newZ = c.z;
+    }
     // live mesh update for smoothness
     const mesh = meshMapRef.current.get(drag.instanceId);
     if (mesh) {
@@ -4874,21 +4966,29 @@ export default function BoothSimulator() {
         rotation: 0,
         addOns: [],
       };
-      setProducts((prev) => [...prev, newProduct]);
+      setProducts((prev) => [...prev, keepIn(newProduct, booth)]);
       setSelectedId(id);
     },
-    [booth.depth]
+    [booth]
   );
 
   const updateSelected = useCallback(
     (patch) => {
       if (!selectedId) return;
       setProducts((prev) =>
-        prev.map((p) => (p.instanceId === selectedId ? { ...p, ...patch } : p))
+        prev.map((p) => (p.instanceId === selectedId ? keepIn({ ...p, ...patch }, booth) : p))
       );
     },
-    [selectedId]
+    [selectedId, booth]
   );
+
+  // a smaller booth pulls everything back inside
+  useEffect(() => {
+    setProducts((prev) => {
+      const next = prev.map((p) => keepIn(p, booth));
+      return next.some((p, i) => p !== prev[i]) ? next : prev;
+    });
+  }, [booth.width, booth.depth]);
 
   const deleteSelected = useCallback(() => {
     if (!selectedId) return;
@@ -4906,20 +5006,20 @@ export default function BoothSimulator() {
       instanceId: newId,
       position: { x: orig.position.x + 0.3, z: orig.position.z + 0.3 },
     };
-    setProducts((prev) => [...prev, copy]);
+    setProducts((prev) => [...prev, keepIn(copy, booth)]);
     setSelectedId(newId);
-  }, [selectedId]);
+  }, [selectedId, booth]);
 
   const rotateSelected = useCallback(() => {
     if (!selectedId) return;
     setProducts((prev) =>
       prev.map((p) =>
         p.instanceId === selectedId
-          ? { ...p, rotation: ((p.rotation || 0) + 90) % 360 }
+          ? keepIn({ ...p, rotation: ((p.rotation || 0) + 90) % 360 }, booth)
           : p
       )
     );
-  }, [selectedId]);
+  }, [selectedId, booth]);
 
   /* ---------- save / load / export ---------- */
   const saveJSON = () => {
@@ -6369,6 +6469,15 @@ function StaffEditor({ product, update, fixed }) {
           value={product.staffName ?? (fixed ? '이과장' : '')}
           maxLength={12}
           onChange={(e) => update({ staffName: e.target.value })}
+          className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+        />
+      </Field>
+      <Field label={tr('Speech bubble')}>
+        <input
+          type="text"
+          value={product.staffSay ?? 'Hi, how are you?'}
+          maxLength={40}
+          onChange={(e) => update({ staffSay: e.target.value })}
           className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"
         />
       </Field>
