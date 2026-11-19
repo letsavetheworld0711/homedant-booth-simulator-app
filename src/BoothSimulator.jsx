@@ -21,6 +21,10 @@ import {
   ChevronRight,
   Maximize2,
   FilePlus,
+  Settings,
+  FolderOpen,
+  Footprints,
+  Check,
 } from 'lucide-react';
 
 /* ============================================================
@@ -1171,6 +1175,30 @@ const KO = {
   "The washing machine does not fit. Use a width of 700 or more and raise the lowest level.": "세탁기가 들어가지 않습니다. 폭을 700 이상으로 하고 가장 아래 단을 올려주세요.",
   "Laptop": "노트북",
   "Booth Staff": "부스 직원",
+  "Basic": "기본",
+  "Levels": "단",
+  "Display": "진열",
+  "Enter position": "위치 직접 입력",
+  "Rotate": "회전",
+  "In this booth": "부스에 놓인 제품",
+  "Click a product here or in the 3D view to edit it.": "여기나 3D 화면에서 제품을 누르면 편집할 수 있습니다.",
+  "Add products from the list on the left.": "왼쪽 목록에서 제품을 추가하세요.",
+  "Tip: drag a board of the selected shelf up or down in the 3D view.": "팁: 3D 화면에서 선택한 선반의 합판을 위아래로 끌어도 됩니다.",
+  "Show name": "전시회 이름",
+  "Type the show name": "전시회 이름 입력",
+  "My designs": "내 디자인",
+  "Export": "내보내기",
+  "Save": "저장",
+  "Design library": "디자인 보관함",
+  "Open JSON file": "JSON 파일 열기",
+  "Current view (PNG)": "현재 화면 (PNG)",
+  "Front, top and 45° (3 PNGs)": "정면·위·45° (PNG 3장)",
+  "Layout file (JSON)": "레이아웃 파일 (JSON)",
+  "Language": "언어",
+  "Booth settings": "부스 설정",
+  "Size": "크기",
+  "Unit": "단위",
+  "New layout": "새 레이아웃",
   "Manager Lee": "이과장",
   "Staff": "직원",
   "Name tag": "이름표",
@@ -1222,13 +1250,18 @@ function loadLang() {
    'dark'   - dark hall floor with a blue aisle, like a convention centre
    Colours are material colours; up-facing surfaces read about 1.46x
    brighter on screen under the scene lights.                          */
+// UI tones: panels a pale grey, the 3D view a step darker so white walls
+// stand out, white for anything you can click or type into
+const UI_PANEL = '#f7f7f5';
+const UI_LINE = '#e3e3df';
+
 // look used for new booths and for saved layouts made before looks existed
 const DEFAULT_LOOK = 'carpet';
 const BOOTH_LOOKS = {
   plan: {
     label: 'Plan',
     hint: 'White floor with grid',
-    background: 0xf3f4f6,
+    background: 0xe4e5e8,
     floor: 0xfafafa,
     grid: true,
     carpet: false,
@@ -1238,7 +1271,7 @@ const BOOTH_LOOKS = {
   carpet: {
     label: 'Carpet',
     hint: 'Grey carpet, white walls',
-    background: 0xd9dbdf,
+    background: 0xdcdde0,
     floor: 0x6a6c70,
     grid: false,
     carpet: true,
@@ -2098,6 +2131,7 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
     else if (i === 0) y = yBoardBottom;
     else y = yBoardBottom + (i / (tiers - 1)) * (yBoardTop - yBoardBottom);
     if (hhLevels) y = hhLevels[i].h * MM_TO_M - thickness / 2;
+    const before = group.children.length;
     addBoardWithBeams(group, w, d, y, boardMat, frameMat, {
       postSize,
       thickness,
@@ -2107,6 +2141,7 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
       hhPerf: isHH && frameMat.userData.hh.perf ? frameMat.userData.hh.perf[i] || 0 : 0,
       hhPerfUp: isHH && !!frameMat.userData.hh.perfUp,
     });
+    if (hhLevels) for (let k = before; k < group.children.length; k++) group.children[k].userData.hhLevel = i;
     const hh = isHH ? frameMat.userData.hh : null;
     if (hhLevels && hh.product.showItems) {
       // dress the level: work out its board surface and the room above it
@@ -4303,6 +4338,7 @@ export default function BoothSimulator() {
   const [warnings, setWarnings] = useState({}); // instanceId -> reason
   // current layout name (used in exported PNG filenames)
   const [layoutName, setLayoutName] = useState('layout1');
+  const [openMenu, setOpenMenu] = useState(null); // header menus and booth settings
   // saved designs library (persisted in localStorage)
   const [savedDesigns, setSavedDesigns] = useState([]);
   const [showLibrary, setShowLibrary] = useState(false);
@@ -4323,6 +4359,8 @@ export default function BoothSimulator() {
   const productsGroupRef = useRef(null);
   const meshMapRef = useRef(new Map()); // instanceId -> THREE.Group
   const dragRef = useRef(null);
+  const levelDragRef = useRef(null); // dragging one shelf level in 3D
+  const [levelTip, setLevelTip] = useState(null); // height label by the cursor
   const animationIdRef = useRef(null);
   const productsRef = useRef(products);
   const selectedRef = useRef(selectedId);
@@ -4854,6 +4892,42 @@ export default function BoothSimulator() {
     return null;
   }, []);
 
+  // like pickInstanceId, but also says which shelf level was hit
+  const pickLevelHit = useCallback((event) => {
+    const renderer = rendererRef.current;
+    const camera = cameraRef.current;
+    const productsGroup = productsGroupRef.current;
+    if (!renderer || !camera || !productsGroup) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(
+      { x: ((event.clientX - rect.left) / rect.width) * 2 - 1, y: -((event.clientY - rect.top) / rect.height) * 2 + 1 },
+      camera
+    );
+    const hits = ray.intersectObjects(productsGroup.children, true);
+    for (const h of hits) {
+      // only solid parts: the selection outline is made of lines
+      if (!h.object.isMesh || h.object.isSprite) continue;
+      let o = h.object,
+        level;
+      while (o) {
+        if (level === undefined && o.userData && o.userData.hhLevel !== undefined) level = o.userData.hhLevel;
+        if (o.userData && o.userData.instanceId) return { id: o.userData.instanceId, level, point: h.point };
+        o = o.parent;
+      }
+    }
+    return null;
+  }, []);
+
+  // which product can have its levels dragged in 3D, and its levels
+  const levelTarget = (id) => {
+    const p = productsRef.current.find((q) => q.instanceId === id);
+    if (!p) return null;
+    const tpl = PRODUCT_LIBRARY.find((t) => t.id === p.productId);
+    if (!tpl || tpl.brand !== 'HOMEDANT HOUSE' || !HH_LEVEL_TYPES.includes(tpl.type)) return null;
+    return { p, levels: hhResolveLevels(p, p.tier || tpl.defaultTier) };
+  };
+
   const getFloorPoint = useCallback((event) => {
     const renderer = rendererRef.current;
     const camera = cameraRef.current;
@@ -4871,6 +4945,32 @@ export default function BoothSimulator() {
 
   const onCanvasMouseDown = (e) => {
     if (e.button !== 0) return; // only left click for products
+    // grabbing a level of the shelf that is already selected moves that
+    // level up and down instead of moving the shelf
+    if (viewMode !== 'top' && selectedId) {
+      const hit = pickLevelHit(e);
+      const target = hit && hit.id === selectedId && hit.level !== undefined ? levelTarget(hit.id) : null;
+      if (target) {
+        const cam = cameraRef.current;
+        const n = new THREE.Vector3();
+        cam.getWorldDirection(n);
+        n.y = 0;
+        if (n.lengthSq() > 1e-4) {
+          n.normalize();
+          levelDragRef.current = {
+            id: hit.id,
+            level: hit.level,
+            plane: new THREE.Plane().setFromNormalAndCoplanarPoint(n, hit.point),
+            startY: hit.point.y,
+            startH: target.levels[hit.level].h,
+            levels: target.levels,
+          };
+          controlsRef.current.enabled = false;
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
     const id = pickInstanceId(e);
     if (id) {
       setSelectedId(id);
@@ -4891,9 +4991,46 @@ export default function BoothSimulator() {
     }
   };
 
+  const showLevelTip = (e, text) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setLevelTip({ x: e.clientX - rect.left, y: e.clientY - rect.top, text });
+  };
   const onCanvasMouseMove = (e) => {
+    const ld = levelDragRef.current;
+    if (ld) {
+      const renderer = rendererRef.current;
+      const rect = renderer.domElement.getBoundingClientRect();
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(
+        { x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 },
+        cameraRef.current
+      );
+      const pt = new THREE.Vector3();
+      if (ray.ray.intersectPlane(ld.plane, pt)) {
+        const p = productsRef.current.find((q) => q.instanceId === ld.id);
+        const next = p && hhMoveLevel(p, ld.levels, ld.level, ld.startH + (pt.y - ld.startY) * 1000);
+        if (next) {
+          ld.levels = next;
+          setProducts((prev) =>
+            prev.map((q) => (q.instanceId === ld.id ? { ...q, levels: next, levelsKey: hhLevelKey(q) } : q))
+          );
+        }
+        showLevelTip(e, `${ld.levels[ld.level].h} mm`);
+      }
+      return;
+    }
     const drag = dragRef.current;
-    if (!drag) return;
+    if (!drag) {
+      // hovering a level of the selected shelf: show it can be dragged
+      if (viewMode !== 'top' && selectedId) {
+        const hit = pickLevelHit(e);
+        const target = hit && hit.id === selectedId && hit.level !== undefined ? levelTarget(hit.id) : null;
+        e.currentTarget.style.cursor = target ? 'ns-resize' : '';
+        if (target) showLevelTip(e, `${target.levels[hit.level].h} mm`);
+        else if (levelTip) setLevelTip(null);
+      }
+      return;
+    }
     const dx = Math.abs(e.clientX - drag.startClientX);
     const dy = Math.abs(e.clientY - drag.startClientY);
     if (!drag.moved && dx + dy < 4) return;
@@ -4919,6 +5056,12 @@ export default function BoothSimulator() {
   };
 
   const onCanvasMouseUp = () => {
+    if (levelDragRef.current) {
+      levelDragRef.current = null;
+      setLevelTip(null);
+      if (controlsRef.current) controlsRef.current.enabled = true;
+      return;
+    }
     const drag = dragRef.current;
     if (drag) {
       if (drag.moved && drag.lastX !== undefined) {
@@ -5336,246 +5479,151 @@ export default function BoothSimulator() {
       className="h-screen w-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden"
       style={{ fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }}
     >
-      {/* TOP BAR */}
-      <header className="flex-none border-b border-gray-300 bg-white">
-        <div className="px-4 py-2 flex items-center gap-x-6 gap-y-2 flex-wrap">
-          {/* title */}
-          <div className="flex items-center pr-4 border-r border-gray-200">
-            <div className="text-sm font-semibold text-gray-900 tracking-tight whitespace-nowrap">
-              {tr('Booth Simulator')}
-            </div>
-            <div className="flex items-center gap-0.5 ml-3">
-              {[
-                ['en', 'EN'],
-                ['ko', '한국어'],
-              ].map(([code, name]) => (
-                <button
-                  key={code}
-                  onClick={() => setLang(code)}
-                  className={
-                    'text-xs px-1.5 py-0.5 rounded border transition ' +
-                    (lang === code
-                      ? 'bg-gray-900 text-white border-gray-900'
-                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50')
-                  }
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* booth dimensions */}
-          <div className="flex items-center gap-3">
-            <div className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-              {tr('Booth')}
-            </div>
-            <NumInput
-              label={tr('Width')}
-              valueMM={booth.width}
-              unit={booth.unit}
-              onChange={(mm) => setBooth({ ...booth, width: mm })}
-            />
-            <NumInput
-              label={tr('Depth')}
-              valueMM={booth.depth}
-              unit={booth.unit}
-              onChange={(mm) => setBooth({ ...booth, depth: mm })}
-            />
-            <NumInput
-              label={tr('Wall H')}
-              valueMM={booth.wallHeight}
-              unit={booth.unit}
-              onChange={(mm) => setBooth({ ...booth, wallHeight: mm })}
-            />
-            <select
-              value={booth.unit}
-              onChange={(e) => setBooth({ ...booth, unit: e.target.value })}
-              className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
-            >
-              <option value="ft">ft</option>
-              <option value="m">m</option>
-              <option value="cm">cm</option>
-              <option value="mm">mm</option>
-            </select>
-          </div>
-
-          {/* templates */}
-          <div className="flex items-center gap-1 pl-3 border-l border-gray-200">
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium mr-1">
-              {tr('Templates')}
-            </span>
-            <PresetBtn onClick={() => applyTemplate('10x10')}>
-              10×10 ft
-            </PresetBtn>
-            <PresetBtn onClick={() => applyTemplate('10x20')}>
-              10×20 ft
-            </PresetBtn>
-            <PresetBtn onClick={() => applyTemplate('20x20')}>
-              20×20 ft
-            </PresetBtn>
-          </div>
-
-          {/* booth style: wall vs curtain */}
-          <div className="flex items-center gap-1 pl-3 border-l border-gray-200">
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium mr-1">
-              {tr('Booth Type')}
-            </span>
-            <button
-              onClick={() => setBoothStyle('wall')}
-              className={
-                'text-xs px-2 py-1 rounded border transition ' +
-                (booth.style === 'wall'
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
-              }
-              title={tr('Solid panel walls')}
-            >
-              {tr('Wall Booth')}
-            </button>
-            <button
-              onClick={() => setBoothStyle('curtain')}
-              className={
-                'text-xs px-2 py-1 rounded border transition ' +
-                (booth.style === 'curtain'
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
-              }
-              title={tr('Pole frame with fabric curtains')}
-            >
-              {tr('Curtain Booth')}
-            </button>
-          </div>
-
-          {/* look of the booth and the hall around it */}
-          <div className="flex items-center gap-1 pl-3 border-l border-gray-200">
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium mr-1">
-              {tr('Look')}
-            </span>
-            {Object.entries(BOOTH_LOOKS).map(([key, lk]) => (
-              <button
-                key={key}
-                onClick={() => setBoothLook(key)}
-                className={
-                  'text-xs px-2 py-1 rounded border transition ' +
-                  ((booth.look || DEFAULT_LOOK) === key
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
-                }
-                title={tr(lk.hint)}
-              >
-                {tr(lk.label)}
-              </button>
-            ))}
-            <button
-              onClick={() => setShowPeople((v) => !v)}
-              className={
-                'text-xs px-2 py-1 rounded border transition ml-1 ' +
-                (showPeople
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
-              }
-              title={tr('Show people walking past the booth')}
-            >
-              {tr('Visitors')}
-            </button>
-          </div>
-
-          {/* layout name + create new */}
-          <div className="flex items-center gap-1.5 pl-3 border-l border-gray-200">
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-              {tr('Layout')}
-            </span>
+      {/* TOP BAR: layout on the left, the show in the middle, file
+          actions on the right */}
+      <header
+        className="flex-none border-b relative z-30"
+        style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}
+      >
+        <div className="px-4 h-12 grid items-center" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
+          <div className="flex items-center gap-2 min-w-0">
+            <img src={HOMEDANT_WORDMARK_URL} alt="HOMEDANT" className="h-4 flex-none" />
+            <span className="text-gray-300">/</span>
             <input
               type="text"
               value={layoutName}
               onChange={(e) => setLayoutName(e.target.value)}
               placeholder={tr('layout name')}
-              className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white w-28"
+              className="text-sm text-gray-800 bg-transparent border border-transparent hover:border-gray-300 focus:border-gray-400 focus:bg-white rounded px-1.5 py-1 w-36 outline-none"
               title={tr('Used in exported PNG filenames')}
             />
-            <IconBtn
+            <button
               onClick={createLayout}
               title={tr('Start a new, empty booth layout')}
+              className="p-1.5 rounded text-gray-500 hover:bg-white hover:text-gray-900"
             >
-              <FilePlus className="w-3.5 h-3.5" /> {tr('Create Layout')}
-            </IconBtn>
+              <FilePlus className="w-4 h-4" />
+            </button>
+            {saveStatus && (
+              <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                <Check className="w-3.5 h-3.5" /> {saveStatus}
+              </span>
+            )}
           </div>
 
-          <div className="flex-1 min-w-0" />
+          {/* the show this booth is for */}
+          <input
+            type="text"
+            value={booth.show || ''}
+            onChange={(e) => setBooth({ ...booth, show: e.target.value })}
+            placeholder={tr('Type the show name')}
+            title={tr('Show name')}
+            className="text-center text-base font-semibold text-gray-900 placeholder:text-gray-400 placeholder:font-normal bg-transparent border border-transparent hover:border-gray-300 focus:border-gray-400 focus:bg-white rounded px-3 py-1 outline-none"
+            style={{ width: 'min(42vw, 520px)' }}
+          />
 
-          {/* actions */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <ViewBtn
-              active={viewMode === '3d'}
-              onClick={() => setViewMode('3d')}
+          <div className="flex items-center gap-1.5 justify-end">
+            <MenuButton
+              open={openMenu === 'designs'}
+              onToggle={() => setOpenMenu(openMenu === 'designs' ? null : 'designs')}
+              icon={<FolderOpen className="w-3.5 h-3.5" />}
+              label={tr('My designs')}
             >
-              <Box className="w-3.5 h-3.5" /> {tr('3D')}
-            </ViewBtn>
-            <ViewBtn
-              active={viewMode === 'top'}
-              onClick={() => setViewMode('top')}
+              <MenuItem
+                onClick={() => {
+                  setShowLibrary(true);
+                  setOpenMenu(null);
+                }}
+              >
+                <Layers className="w-3.5 h-3.5" /> {tr('Design library')}
+              </MenuItem>
+              <label className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">
+                <Upload className="w-3.5 h-3.5" /> {tr('Open JSON file')}
+                <input
+                  type="file"
+                  accept=".json"
+                  hidden
+                  onChange={(e) => {
+                    if (e.target.files[0]) {
+                      loadJSON(e.target.files[0]);
+                      e.target.value = '';
+                    }
+                    setOpenMenu(null);
+                  }}
+                />
+              </label>
+            </MenuButton>
+            <MenuButton
+              open={openMenu === 'export'}
+              onToggle={() => setOpenMenu(openMenu === 'export' ? null : 'export')}
+              icon={<Download className="w-3.5 h-3.5" />}
+              label={tr('Export')}
             >
-              <Grid3x3 className="w-3.5 h-3.5" /> {tr('Top')}
-            </ViewBtn>
-            <ViewBtn
-              active={viewMode === 'front'}
-              onClick={() => setViewMode('front')}
-            >
-              <Eye className="w-3.5 h-3.5" /> {tr('Front')}
-            </ViewBtn>
-            <div className="w-px h-5 bg-gray-300 mx-1" />
-            <IconBtn onClick={savePNG} title={tr('Save current view as PNG')}>
-              <Camera className="w-3.5 h-3.5" /> {tr('PNG')}
-            </IconBtn>
-            <IconBtn
-              onClick={exportBoothImages}
-              title={tr('Export front / top / 45° views as 3 PNGs')}
-            >
-              <Camera className="w-3.5 h-3.5" /> {tr('Export Images')}
-            </IconBtn>
-            <div className="w-px h-5 bg-gray-300 mx-1" />
-            <IconBtn
+              <MenuItem
+                onClick={() => {
+                  setOpenMenu(null);
+                  savePNG();
+                }}
+              >
+                <Camera className="w-3.5 h-3.5" /> {tr('Current view (PNG)')}
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  setOpenMenu(null);
+                  exportBoothImages();
+                }}
+              >
+                <Camera className="w-3.5 h-3.5" /> {tr('Front, top and 45° (3 PNGs)')}
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  setOpenMenu(null);
+                  saveJSON();
+                }}
+              >
+                <Download className="w-3.5 h-3.5" /> {tr('Layout file (JSON)')}
+              </MenuItem>
+            </MenuButton>
+            <button
               onClick={() => saveDesign()}
               title={tr('Save this booth design to the in-app library')}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-700"
             >
-              <Save className="w-3.5 h-3.5" /> {tr('Save Design')}
-            </IconBtn>
-            <IconBtn
-              onClick={() => setShowLibrary((v) => !v)}
-              title={tr('Show / hide the Design Library')}
+              <Save className="w-3.5 h-3.5" /> {tr('Save')}
+            </button>
+            <MenuButton
+              open={openMenu === 'settings'}
+              onToggle={() => setOpenMenu(openMenu === 'settings' ? null : 'settings')}
+              icon={<Settings className="w-4 h-4" />}
+              iconOnly
+              label={tr('Language')}
             >
-              <Layers className="w-3.5 h-3.5" /> {tr('Library')}
-            </IconBtn>
-            <div className="w-px h-5 bg-gray-300 mx-1" />
-            <IconBtn onClick={saveJSON} title={tr('Download as JSON file')}>
-              <Download className="w-3.5 h-3.5" /> {tr('JSON')}
-            </IconBtn>
-            <label
-              title={tr('Load JSON file')}
-              className="cursor-pointer inline-flex items-center gap-1 text-xs px-2 py-1.5 rounded border border-gray-300 hover:bg-gray-50 transition"
-            >
-              <Upload className="w-3.5 h-3.5" /> {tr('Load')}
-              <input
-                type="file"
-                accept=".json"
-                hidden
-                onChange={(e) => {
-                  if (e.target.files[0]) {
-                    loadJSON(e.target.files[0]);
-                    e.target.value = '';
-                  }
-                }}
-              />
-            </label>
+              <div className="px-3 pt-2 pb-1 text-[11px] text-gray-500">{tr('Language')}</div>
+              {[
+                ['en', 'English'],
+                ['ko', '한국어'],
+              ].map(([code, name]) => (
+                <MenuItem
+                  key={code}
+                  onClick={() => {
+                    setLang(code);
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="w-3.5">{lang === code && <Check className="w-3.5 h-3.5" />}</span> {name}
+                </MenuItem>
+              ))}
+            </MenuButton>
           </div>
         </div>
       </header>
+      {/* clicking anywhere else closes an open menu */}
+      {openMenu && <div className="fixed inset-0 z-20" onClick={() => setOpenMenu(null)} />}
 
       {/* MAIN AREA */}
       <div className="flex-1 flex overflow-hidden">
         {/* LEFT PANEL */}
-        <aside className="flex-none w-72 border-r border-gray-300 bg-white flex flex-col">
+        <aside className="flex-none w-72 border-r flex flex-col" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
           <div className="flex-none border-b border-gray-200 px-3 py-2.5">
             <div className="text-xs uppercase tracking-wider text-gray-500 font-medium mb-2">
               {tr('Product Library')}
@@ -5663,44 +5711,137 @@ export default function BoothSimulator() {
 
         {/* CENTER 3D CANVAS */}
         <main
-          className="flex-1 relative bg-gray-100"
+          className="flex-1 relative"
+          style={{ backgroundColor: '#dcdde0' }}
           onMouseDown={onCanvasMouseDown}
           onMouseMove={onCanvasMouseMove}
           onMouseUp={onCanvasMouseUp}
           onClick={onCanvasClick}
         >
           <div ref={mountRef} className="absolute inset-0" />
-          {/* overlay info */}
+          {/* booth size: click to open the booth settings */}
           <div
-            style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
-            className="absolute top-3 left-3 backdrop-blur border border-gray-200 rounded px-3 py-2 text-xs text-gray-700 leading-snug pointer-events-none"
+            className="absolute top-3 left-3 z-30"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="font-medium text-gray-900 mb-0.5">
-              {fromMM(booth.width, booth.unit)} ×{' '}
-              {fromMM(booth.depth, booth.unit)} {booth.unit}
-            </div>
-            <div className="text-gray-500">
-              {fromMM(booth.width, 'mm')} × {fromMM(booth.depth, 'mm')} mm ·{' '}
-              {tr('wall')} {fromMM(booth.wallHeight, booth.unit)}
-              {booth.unit}
-            </div>
+            <button
+              onClick={() => setOpenMenu(openMenu === 'booth' ? null : 'booth')}
+              className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-left text-xs leading-snug hover:border-gray-400 shadow-sm"
+            >
+              <div className="font-medium text-gray-900 flex items-center gap-1">
+                {fromMM(booth.width, booth.unit)} × {fromMM(booth.depth, booth.unit)} {booth.unit}
+                <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+              </div>
+              <div className="text-gray-500">
+                {tr(booth.style === 'curtain' ? 'Curtain Booth' : 'Wall Booth')} · {tr('wall')}{' '}
+                {fromMM(booth.wallHeight, booth.unit)}
+                {booth.unit}
+              </div>
+            </button>
+            {openMenu === 'booth' && (
+              <div className="mt-1.5 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3 space-y-3">
+                <div className="text-xs font-medium text-gray-900">{tr('Booth settings')}</div>
+                <div>
+                  <div className="text-[11px] text-gray-500 mb-1">{tr('Templates')}</div>
+                  <div className="flex gap-1">
+                    {['10x10', '10x20', '20x20'].map((t) => (
+                      <PresetBtn key={t} onClick={() => applyTemplate(t)}>
+                        {t.replace('x', '×')} ft
+                      </PresetBtn>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-gray-500 mb-1">{tr('Size')}</div>
+                  <div className="flex flex-col gap-1.5">
+                    <NumInput label={tr('Width')} valueMM={booth.width} unit={booth.unit} onChange={(mm) => setBooth({ ...booth, width: mm })} />
+                    <NumInput label={tr('Depth')} valueMM={booth.depth} unit={booth.unit} onChange={(mm) => setBooth({ ...booth, depth: mm })} />
+                    <NumInput label={tr('Wall H')} valueMM={booth.wallHeight} unit={booth.unit} onChange={(mm) => setBooth({ ...booth, wallHeight: mm })} />
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-gray-500 mb-1">{tr('Unit')}</div>
+                  <div className="flex gap-1">
+                    {['ft', 'm', 'cm', 'mm'].map((u) => (
+                      <button
+                        key={u}
+                        onClick={() => setBooth({ ...booth, unit: u })}
+                        className={
+                          'flex-1 text-xs py-1 rounded border ' +
+                          (booth.unit === u ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
+                        }
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-gray-500 mb-1">{tr('Booth Type')}</div>
+                  <div className="flex gap-1">
+                    {[
+                      ['wall', 'Wall Booth', 'Solid panel walls'],
+                      ['curtain', 'Curtain Booth', 'Pole frame with fabric curtains'],
+                    ].map(([k, label, hint]) => (
+                      <button
+                        key={k}
+                        onClick={() => setBoothStyle(k)}
+                        title={tr(hint)}
+                        className={
+                          'flex-1 text-xs py-1 rounded border ' +
+                          (booth.style === k ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
+                        }
+                      >
+                        {tr(label)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <div
-            style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
-            className="absolute bottom-3 left-3 backdrop-blur border border-gray-200 rounded px-3 py-1.5 text-xs text-gray-600 pointer-events-none"
-          >
-            <span className="font-medium">{tr('L-Drag')}</span> {tr('rotate')}{' '}
-            · <span className="font-medium">{tr('R-Drag')}</span> {tr('pan')} ·{' '}
-            <span className="font-medium">{tr('Wheel')}</span> {tr('zoom')} ·{' '}
-            <span className="font-medium">{tr('Click')}</span> {tr('select')}
-          </div>
-          {/* brief "Saved ✓" confirmation (Ctrl+S or Save Design) */}
-          {saveStatus && (
-            <div className="absolute bottom-3 right-3 bg-green-600 text-white rounded px-3 py-1.5 text-xs font-medium shadow-md pointer-events-none flex items-center gap-1.5">
-              <Save className="w-3.5 h-3.5" />
-              {saveStatus}
+
+          {levelTip && (
+            <div
+              className="absolute z-20 pointer-events-none bg-gray-900 text-white text-xs font-medium rounded px-2 py-1 tabular-nums"
+              style={{ left: levelTip.x + 14, top: levelTip.y - 12 }}
+            >
+              {levelTip.text}
             </div>
           )}
+          {/* view toolbar: what you look at, and how */}
+          <div
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg p-1 shadow-sm whitespace-nowrap"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {[
+              ['3d', <Box key="i" className="w-3.5 h-3.5" />, '3D'],
+              ['top', <Grid3x3 key="i" className="w-3.5 h-3.5" />, 'Top'],
+              ['front', <Eye key="i" className="w-3.5 h-3.5" />, 'Front'],
+            ].map(([m, icon, label]) => (
+              <ToolBtn key={m} active={viewMode === m} onClick={() => setViewMode(m)}>
+                {icon} {tr(label)}
+              </ToolBtn>
+            ))}
+            <div className="w-px h-5 bg-gray-200 mx-1" />
+            {Object.entries(BOOTH_LOOKS).map(([key, lk]) => (
+              <ToolBtn key={key} active={(booth.look || DEFAULT_LOOK) === key} onClick={() => setBoothLook(key)} title={tr(lk.hint)}>
+                {tr(lk.label)}
+              </ToolBtn>
+            ))}
+            <div className="w-px h-5 bg-gray-200 mx-1" />
+            <ToolBtn active={showPeople} onClick={() => setShowPeople((v) => !v)} title={tr('Show people walking past the booth')}>
+              <Footprints className="w-3.5 h-3.5" /> {tr('Visitors')}
+            </ToolBtn>
+            <ToolBtn onClick={savePNG} title={tr('Save current view as PNG')}>
+              <Camera className="w-3.5 h-3.5" />
+            </ToolBtn>
+          </div>
+          <div className="absolute bottom-3 left-3 text-[11px] text-gray-500 pointer-events-none">
+            {tr('L-Drag')} {tr('rotate')} · {tr('R-Drag')} {tr('pan')} · {tr('Wheel')} {tr('zoom')}
+          </div>
           {Object.keys(warnings).length > 0 &&
             (() => {
               // group flagged items by reason for a clear breakdown
@@ -5862,17 +6003,9 @@ export default function BoothSimulator() {
         )}
 
         {/* RIGHT PANEL */}
-        <aside className="flex-none w-80 border-l border-gray-300 bg-white flex flex-col">
+        <aside className="flex-none w-80 border-l flex flex-col" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
           {!selected ? (
-            <div className="flex-1 flex items-center justify-center p-6 text-center">
-              <div className="text-gray-400 text-sm">
-                <Box className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <div>{tr('Select a product to edit')}</div>
-                <div className="text-xs mt-1">
-                  {tr('or click a product in the library to add')}
-                </div>
-              </div>
-            </div>
+            <BoothOverview products={products} warnings={warnings} onSelect={setSelectedId} />
           ) : (
             <PropertyPanel
               product={selected}
@@ -5904,38 +6037,75 @@ function PropertyPanel({
   del,
   boothSize,
 }) {
+  // which tabs this product has: basic is always there
+  const [tab, setTab] = useState('basic');
   if (!tpl) return null;
+  const isHH = tpl.brand === 'HOMEDANT HOUSE';
+  const tabs = [['basic', 'Basic']];
+  if (isHH && HH_LEVEL_TYPES.includes(tpl.type)) tabs.push(['levels', 'Levels']);
+  if (isHH && HH_ITEM_TYPES.includes(tpl.type)) tabs.push(['items', 'Display']);
+  const current = tabs.some(([k]) => k === tab) ? tab : 'basic';
+  const iconBtn = 'p-1.5 rounded text-gray-500 hover:bg-white hover:text-gray-900';
   const xMin = (-boothSize.w * MM_TO_M) / 2;
   const xMax = (boothSize.w * MM_TO_M) / 2;
   const zMin = (-boothSize.d * MM_TO_M) / 2;
   const zMax = (boothSize.d * MM_TO_M) / 2;
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      {/* header */}
-      <div className="px-4 py-3 border-b border-gray-200">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-              {tpl.brand}
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* name, with the actions you reach for most */}
+      <div className="flex-none px-4 pt-3 pb-2">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] text-gray-500 truncate">
+              {tpl.brand === 'HOMEDANT HOUSE' ? 'HOMEDANT HOUSE' : tr(tpl.category)}
             </div>
-            <div className="font-semibold text-sm leading-tight mt-0.5 truncate">
-              {tr(product.name)}
-            </div>
-            <div className="text-xs text-gray-500 mt-0.5">{tr(tpl.category)}</div>
+            <div className="font-semibold text-sm leading-tight mt-0.5 truncate">{tr(product.name)}</div>
           </div>
-          {warning && (
-            <span
-              className="flex-none inline-flex items-center gap-1 text-xs px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-medium"
-              title={warningReasonLabel(warning)}
-            >
-              <AlertTriangle className="w-3 h-3" />
-              {tr(WARNING_REASON_SHORT[warning] || 'Review')}
-            </span>
-          )}
+          <button onClick={rotate} title={tr('Rotate') + ' 90°'} className={iconBtn}>
+            <RotateCw className="w-4 h-4" />
+          </button>
+          <button onClick={duplicate} title={tr('Duplicate')} className={iconBtn}>
+            <Copy className="w-4 h-4" />
+          </button>
+          <button onClick={del} title={tr('Delete')} className="p-1.5 rounded text-gray-500 hover:bg-red-50 hover:text-red-600">
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
+        {warning && (
+          <div className="mt-2">
+      
+        <span
+          className="flex-none inline-flex items-center gap-1 text-xs px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-medium"
+          title={warningReasonLabel(warning)}
+        >
+          <AlertTriangle className="w-3 h-3" />
+          {tr(WARNING_REASON_SHORT[warning] || 'Review')}
+        </span>
+          </div>
+        )}
       </div>
 
+      {tabs.length > 1 && (
+        <div className="flex-none flex gap-1 px-4 pb-2 border-b" style={{ borderColor: UI_LINE }}>
+          {tabs.map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={
+                'flex-1 text-xs py-1.5 rounded transition ' +
+                (current === k ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-white')
+              }
+            >
+              {tr(label)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto">
+        {current === 'basic' && (
+          <>
       {/* dimensions */}
       <Section title={tr('Dimensions')}>
         <SizeSelect
@@ -6061,16 +6231,41 @@ function PropertyPanel({
       </Section>
       )}
 
-      {tpl.brand === 'HOMEDANT HOUSE' && HH_ITEM_TYPES.includes(tpl.type) && (
-        <HHItemEditor product={product} tpl={tpl} update={update} />
+      {/* add-ons */}
+      {tpl.addOns.length > 0 && (
+        <Section title={tr('Add-on Options')}>
+          <div className="grid grid-cols-2 gap-1">
+            {tpl.addOns.map((a) => {
+              const active = (product.addOns || []).includes(a);
+              return (
+                <button
+                  key={a}
+                  onClick={() => {
+                    const cur = product.addOns || [];
+                    update({
+                      addOns: active ? cur.filter((x) => x !== a) : [...cur, a],
+                    });
+                  }}
+                  className={`text-xs py-1 px-1.5 rounded border transition truncate ${
+                    active
+                      ? 'border-red-500 bg-red-50 text-red-700'
+                      : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {tr(a)}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
       )}
 
-      {tpl.brand === 'HOMEDANT HOUSE' && HH_LEVEL_TYPES.includes(tpl.type) && (
-        <HHLevelEditor product={product} tpl={tpl} update={update} />
-      )}
 
-      {/* position */}
-      <Section title={tr('Position & Rotation')}>
+            <details className="border-b border-gray-200">
+              <summary className="px-4 py-2.5 text-xs text-gray-500 cursor-pointer select-none">
+                {tr('Enter position')}
+              </summary>
+          <div className="px-4 pb-3">
         <Field label={tr('X (m)')}>
           <input
             type="number"
@@ -6122,60 +6317,30 @@ function PropertyPanel({
             </button>
           </div>
         </Field>
-      </Section>
-
-      {/* add-ons */}
-      {tpl.addOns.length > 0 && (
-        <Section title={tr('Add-on Options')}>
-          <div className="grid grid-cols-2 gap-1">
-            {tpl.addOns.map((a) => {
-              const active = (product.addOns || []).includes(a);
-              return (
-                <button
-                  key={a}
-                  onClick={() => {
-                    const cur = product.addOns || [];
-                    update({
-                      addOns: active ? cur.filter((x) => x !== a) : [...cur, a],
-                    });
-                  }}
-                  className={`text-xs py-1 px-1.5 rounded border transition truncate ${
-                    active
-                      ? 'border-red-500 bg-red-50 text-red-700'
-                      : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {tr(a)}
-                </button>
-              );
-            })}
           </div>
-        </Section>
+
+
+            </details>
+          </>
+        )}
+        {current === 'levels' && (
+          <>
+      {tpl.brand === 'HOMEDANT HOUSE' && HH_LEVEL_TYPES.includes(tpl.type) && (
+        <HHLevelEditor product={product} tpl={tpl} update={update} />
       )}
 
-      {/* size summary */}
-      <Section title={tr('Summary')}>
-        <div className="grid grid-cols-3 gap-2 text-xs">
-          <SumCell label={tr('W')} mm={product.width} />
-          <SumCell label={tr('D')} mm={product.depth} />
-          <SumCell label={tr('H')} mm={product.height} />
-        </div>
-      </Section>
 
-      {/* actions */}
-      <div className="px-4 py-3 border-t border-gray-200 flex gap-2 sticky bottom-0 bg-white">
-        <button
-          onClick={duplicate}
-          className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5 border border-gray-300 rounded hover:bg-gray-50"
-        >
-          <Copy className="w-3.5 h-3.5" /> {tr('Duplicate')}
-        </button>
-        <button
-          onClick={del}
-          className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5 border border-red-300 text-red-700 rounded hover:bg-red-50"
-        >
-          <Trash2 className="w-3.5 h-3.5" /> {tr('Delete')}
-        </button>
+          </>
+        )}
+        {current === 'items' && (
+          <>
+      {tpl.brand === 'HOMEDANT HOUSE' && HH_ITEM_TYPES.includes(tpl.type) && (
+        <HHItemEditor product={product} tpl={tpl} update={update} />
+      )}
+
+
+          </>
+        )}
       </div>
     </div>
   );
@@ -6205,6 +6370,91 @@ function NumInput({ label, valueMM, unit, onChange }) {
         className="w-16 text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
       />
     </label>
+  );
+}
+
+/* Right panel when nothing is selected: what is in the booth, and any
+   placement reminders. Click a line to select that product.           */
+function BoothOverview({ products, warnings, onSelect }) {
+  const nWarn = Object.keys(warnings).length;
+  return (
+    <div className="flex-1 overflow-y-auto p-4">
+      <div className="text-sm font-semibold text-gray-900 mb-1">{tr('In this booth')}</div>
+      <div className="text-xs text-gray-500 mb-3">
+        {products.length
+          ? tr('Click a product here or in the 3D view to edit it.')
+          : tr('Add products from the list on the left.')}
+      </div>
+      {products.map((p) => (
+        <button
+          key={p.instanceId}
+          onClick={() => onSelect(p.instanceId)}
+          className="w-full flex items-center gap-2 text-left text-xs px-2.5 py-2 mb-1 rounded bg-white border border-gray-200 hover:border-gray-400"
+        >
+          <span className="flex-1 truncate text-gray-800">{tr(p.name)}</span>
+          <span className="text-gray-400 tabular-nums">
+            {p.width}×{p.depth}×{p.height}
+          </span>
+          {warnings[p.instanceId] && <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-none" />}
+        </button>
+      ))}
+      {nWarn > 0 && (
+        <div className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2.5 py-2">
+          {tr('Layout Check')}: {nWarn}
+          {tr(nWarn > 1 ? ' items need attention' : ' item needs attention')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuButton({ open, onToggle, icon, label, iconOnly, children }) {
+  return (
+    <div className="relative">
+      <button
+        onClick={onToggle}
+        title={iconOnly ? label : undefined}
+        className={
+          'inline-flex items-center gap-1 text-xs rounded border transition ' +
+          (iconOnly ? 'p-1.5 ' : 'px-2.5 py-1.5 ') +
+          (open ? 'bg-white border-gray-400 text-gray-900' : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400')
+        }
+      >
+        {icon}
+        {!iconOnly && (
+          <>
+            {label}
+            <ChevronDown className="w-3 h-3 text-gray-500" />
+          </>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-40">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+function MenuItem({ onClick, children }) {
+  return (
+    <button onClick={onClick} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 text-left whitespace-nowrap">
+      {children}
+    </button>
+  );
+}
+function ToolBtn({ active, onClick, title, children }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={
+        'inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition ' +
+        (active ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-100')
+      }
+    >
+      {children}
+    </button>
   );
 }
 
@@ -6373,6 +6623,18 @@ function HHItemEditor({ product, tpl, update }) {
 /* Per-level controls for HOMEDANT HOUSE shelves: drag a slider to move a
    level up or down (it snaps to the post slots) and switch that level
    between basic and basket. Listed top level first, like the shelf.   */
+/* Move level i to about `raw` mm: snapped to the slot pitch and kept
+   between its neighbours. Returns the new list, or null if unchanged. */
+function hhMoveLevel(product, levels, i, raw) {
+  const min = i === 0 ? HH_LEVEL_MIN : levels[i - 1].h + HH_LEVEL_GAP;
+  const max = i === levels.length - 1 ? product.height : levels[i + 1].h - HH_LEVEL_GAP;
+  let v = HH_LEVEL_MIN + Math.round((raw - HH_LEVEL_MIN) / HH_LEVEL_STEP) * HH_LEVEL_STEP;
+  if (raw >= max - HH_LEVEL_STEP / 2) v = max; // let a level reach its top stop
+  v = Math.max(min, Math.min(max, v));
+  if (v === levels[i].h) return null;
+  return levels.map((l, k) => (k === i ? { ...l, h: v } : l));
+}
+
 function HHLevelEditor({ product, tpl, update }) {
   const tiers = product.tier || tpl.defaultTier;
   const levels = hhResolveLevels(product, tiers);
@@ -6381,16 +6643,8 @@ function HHLevelEditor({ product, tpl, update }) {
   const commit = (next) =>
     update({ levels: next, levelsKey: hhLevelKey(product) });
   const setHeight = (i, raw) => {
-    const min = i === 0 ? HH_LEVEL_MIN : levels[i - 1].h + HH_LEVEL_GAP;
-    const max =
-      i === levels.length - 1 ? product.height : levels[i + 1].h - HH_LEVEL_GAP;
-    let v =
-      HH_LEVEL_MIN +
-      Math.round((raw - HH_LEVEL_MIN) / HH_LEVEL_STEP) * HH_LEVEL_STEP;
-    if (raw >= max - HH_LEVEL_STEP / 2) v = max; // let a level reach its top stop
-    v = Math.max(min, Math.min(max, v));
-    if (v === levels[i].h) return;
-    commit(levels.map((l, k) => (k === i ? { ...l, h: v } : l)));
+    const next = hhMoveLevel(product, levels, i, raw);
+    if (next) commit(next);
   };
   const toggle = (i) =>
     commit(
@@ -6439,6 +6693,9 @@ function HHLevelEditor({ product, tpl, update }) {
         {tr(
           'Height from the post bottom to the top of each level. Level 1 is the lowest.'
         )}
+      </div>
+      <div className="text-xs text-gray-500 mb-2">
+        {tr('Tip: drag a board of the selected shelf up or down in the 3D view.')}
       </div>
       {rows}
       <button
