@@ -3128,7 +3128,7 @@ function buildHHTrolley(group, p, tpl) {
   hhAdd(
     inner,
     tube,
-    new THREE.MeshStandardMaterial({ color: 0xe8ebee, metalness: 0.15, roughness: 0.25, emissive: 0x2e2e2e }),
+    plastic, // the tube follows the frame colour too: white or black
     w / 2 + 0.046,
     h + 0.017,
     0
