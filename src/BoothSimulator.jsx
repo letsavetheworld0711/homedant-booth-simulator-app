@@ -1283,6 +1283,8 @@ const KO = {
   "New folder": "새 폴더",
   "New folder inside": "이 폴더 안에 새 폴더",
   "Folder name": "폴더 이름",
+  "Shelves": "선반판",
+  "Steel shelves in the frame color.": "선반판도 철판이라 프레임 색을 따라갑니다.",
   "MAX 200 Shelf": "경량랙",
   "MAX 200 Rolling Shelf": "경량랙 바퀴형",
   "MAX 200": "경량랙",
@@ -2003,16 +2005,27 @@ const CORNERS = [
 // SPEEDRACK: open L-angle, one layer of steel, slots on both faces
 function addSPPosts(group, w, d, h, frameMat) {
   const F = SP_SPEC.flange;
-  const H = h + SP_SPEC.topRise; // posts stand a little above the top board
+  const H = h; // posts end at the top board; the safety cap covers the end
   const mL = slottedFaceMat(frameMat, 'sp', false, H),
     mR = slottedFaceMat(frameMat, 'sp', true, H);
   const face = new THREE.PlaneGeometry(F, H);
+  const CAP_H = 0.016,
+    CT = 0.003;
+  const capX = new THREE.BoxGeometry(F + 0.001, CAP_H, CT),
+    capZ = new THREE.BoxGeometry(CT, CAP_H, F - CT);
+  const capSide = plasticOf(frameMat);
+  const capTop = capSide.clone();
+  if (isLightHex(frameMat.color.getHex())) capTop.color.setHex(frameMat.color.getHex()).multiplyScalar(0.7);
+  const capMat = [capSide, capSide, capTop, capSide, capSide, capSide];
   CORNERS.forEach(([sx, sz]) => {
     const ex = sx * (w / 2),
       ez = sz * (d / 2);
     hhAdd(group, face, sx > 0 ? mR : mL, ex - sx * (F / 2), H / 2, ez - sz * 0.0008);
     const side = hhAdd(group, face, sz > 0 ? mR : mL, ex - sx * 0.0008, H / 2, ez - sz * (F / 2));
     side.rotation.y = -Math.PI / 2;
+    // safety cap: plastic L over the post end, flush with the top board
+    hhAdd(group, capX, capMat, ex - sx * (F / 2), h - CAP_H / 2, ez - sz * (CT / 2));
+    hhAdd(group, capZ, capMat, ex - sx * (CT / 2), h - CAP_H / 2, ez - sz * (CT + (F - CT) / 2));
   });
 }
 // MAX 200: C-channel, closed on the outside, open toward the shelf
@@ -2047,13 +2060,14 @@ function addSPFeet(group, w, d, frameMat) {
     T = 0.003;
   const gx = new THREE.BoxGeometry(L, H, T),
     gz = new THREE.BoxGeometry(T, H, L),
-    pad = new THREE.BoxGeometry(L * 0.62, 0.004, L * 0.62);
+    pad = new THREE.BoxGeometry(L * 0.72, 0.011, L * 0.72);
   CORNERS.forEach(([sx, sz]) => {
     const ex = sx * (w / 2),
       ez = sz * (d / 2);
-    hhAdd(group, gx, m, ex - sx * (L / 2), H / 2, ez - sz * (T / 2));
-    hhAdd(group, gz, m, ex - sx * (T / 2), H / 2, ez - sz * (L / 2));
-    hhAdd(group, pad, m, ex - sx * (L * 0.31), 0.002, ez - sz * (L * 0.31));
+    // the frame is lifted FRAME_LIFT; the foot reaches down to the floor
+    hhAdd(group, gx, m, ex - sx * (L / 2), H / 2 - FRAME_LIFT, ez - sz * (T / 2));
+    hhAdd(group, gz, m, ex - sx * (T / 2), H / 2 - FRAME_LIFT, ez - sz * (L / 2));
+    hhAdd(group, pad, m, ex - sx * (L * 0.36), -FRAME_LIFT + 0.0055, ez - sz * (L * 0.36));
   });
 }
 // MAX 200 foot: a square plastic cap the post stands in
@@ -2075,7 +2089,8 @@ function addLRLevel(group, w, d, yBoard, frameMat, thickness) {
   const wi = w - 2 * PW; // between the posts
   const hex = frameMat.color.getHex();
   const deckTop = frameMat.clone();
-  if (isLightHex(hex)) deckTop.color.setHex(hex).multiplyScalar(0.86);
+  // toned down like the post caps so a light colour doesn't burn out to white under the top light
+  if (isLightHex(hex)) deckTop.color.setHex(hex).multiplyScalar(0.72);
   const deckMat = [frameMat, frameMat, deckTop, frameMat, frameMat, frameMat];
   const isEnd = cur.i === 0 || cur.i === cur.n - 1;
   if (isEnd) {
@@ -2163,7 +2178,7 @@ function addHHPosts(group, w, d, h, frameMat) {
     hhAdd(group, hem, frameMat, ex - sx * F, h / 2, ez - sz * (T / 2));
     hhAdd(group, hem, frameMat, ex - sx * (T / 2), h / 2, ez - sz * F);
     // top cap closing the L
-    const capY = h + HH_CAP_RISE * MM_TO_M - CAP_H / 2; // top of the cap 11 mm above the frame
+    const capY = h - CAP_H / 2; // the cap slides down over the post end: its top is flush with the top board
     hhAdd(group, capX, capMat, ex - sx * (F / 2), capY, ez - sz * (T / 2));
     hhAdd(group, capZ, capMat, ex - sx * (T / 2), capY, ez - sz * (T + (F - T) / 2));
   });
@@ -2174,9 +2189,12 @@ function addHHFeet(group, w, d, footMat) {
   if (S.kind === 'sp') return addSPFeet(group, w, d, footMat);
   if (S.kind === 'lr') return addLRFeet(group, w, d, footMat);
   const { flange: F, postT: T } = HH;
-  const fh = 0.006;
-  const gx = new THREE.BoxGeometry(F + 0.001, fh, T + 0.001);
-  const gz = new THREE.BoxGeometry(T + 0.001, fh, F - T);
+  // foot cap: from the floor up over the bottom of the post (the frame
+  // is lifted FRAME_LIFT, so this reaches below it)
+  const fh = FRAME_LIFT + 0.012;
+  const gx = new THREE.BoxGeometry(F + 0.0012, fh, T + 0.0012);
+  const gz = new THREE.BoxGeometry(T + 0.0012, fh, F - T);
+  const base = new THREE.BoxGeometry(F * 0.75, FRAME_LIFT, F * 0.75);
   [
     [-1, -1],
     [1, -1],
@@ -2185,8 +2203,9 @@ function addHHFeet(group, w, d, footMat) {
   ].forEach(([sx, sz]) => {
     const ex = sx * (w / 2),
       ez = sz * (d / 2);
-    hhAdd(group, gx, footMat, ex - sx * (F / 2), fh / 2, ez - sz * (T / 2));
-    hhAdd(group, gz, footMat, ex - sx * (T / 2), fh / 2, ez - sz * (T + (F - T) / 2));
+    hhAdd(group, gx, footMat, ex - sx * (F / 2), fh / 2 - FRAME_LIFT, ez - sz * (T / 2));
+    hhAdd(group, gz, footMat, ex - sx * (T / 2), fh / 2 - FRAME_LIFT, ez - sz * (T + (F - T) / 2));
+    hhAdd(group, base, footMat, ex - sx * (F * 0.375), -FRAME_LIFT / 2, ez - sz * (F * 0.375));
   });
 }
 
@@ -3426,6 +3445,9 @@ function hhCasterH(p) {
    the post caps standing 11 mm above the frame. The 3D uses the real
    outside, the name stays as picked.                                    */
 const HH_CAP_RISE = 11;
+// The 11 mm sits under the posts: the frame stands on foot caps (or the
+// caster brackets) that lift it off the floor.
+const FRAME_LIFT = HH_CAP_RISE * 0.001;
 function hhOuterMM(v) {
   return v + (v >= 1200 ? 22 : 20);
 }
@@ -3606,7 +3628,7 @@ function buildRolling(group, p, tpl) {
   const wheelR = 0.04;
   // the frame is lifted by the height of the wheels
   const inner = new THREE.Group();
-  inner.position.y = isHH ? hhCasterH(p) : wheelR * 2;
+  inner.position.y = isHH ? hhCasterH(p) + (specOfProduct(p).kind === 'lr' ? 0 : FRAME_LIFT) : wheelR * 2;
   addPosts(inner, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   addTierBoards(inner, w, d, h, p.tier || tpl.defaultTier, mats.board, {
     frameMat: mats.frame,
@@ -3781,7 +3803,7 @@ function buildHHTrolley(group, p, tpl) {
     }
   }
   const inner = new THREE.Group();
-  inner.position.y = hhCasterH(p);
+  inner.position.y = hhCasterH(p) + FRAME_LIFT;
   addPosts(inner, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   addTierBoards(inner, w, d, h, tiers, mats.board, { frameMat: mats.frame });
   group.add(inner);
@@ -4754,6 +4776,18 @@ function buildTVStand(group, p) {
 }
 
 function buildProductMesh(p, tpl) {
+  const group = buildProductMeshInner(p, tpl);
+  if (
+    isLevelProduct(tpl) &&
+    specOfProduct(p).kind !== 'lr' &&
+    tpl.type !== 'rolling' &&
+    tpl.type !== 'trolley' &&
+    tpl.type !== 'staff'
+  )
+    group.children.forEach((c) => (c.position.y += FRAME_LIFT));
+  return group;
+}
+function buildProductMeshInner(p, tpl) {
   const group = new THREE.Group();
   // HOMEDANT HOUSE: draw the real outside width and depth (see hhOuterSize)
   if (isLevelProduct(tpl)) {
@@ -5189,7 +5223,9 @@ function BuyerSidebar({ lib, folderId, setFolderId, cloudId, onOpenItem, onNewPr
         <span className="text-[11px] font-semibold tracking-wide text-gray-500">{tr('Products')}</span>
         {folderName && cloudId && <span className="text-[10px] text-gray-400 truncate ml-2">{tr('Click to start a new proposal')}</span>}
       </div>
-      {BUYER_TEMPLATES.map((t) => (
+      {BUYER_GROUPS.map((g) => [
+        <div key={'g' + g} className="text-[10px] font-semibold tracking-wider text-gray-400 mt-2.5 mb-1 px-0.5">{g}</div>,
+        ...BUYER_TEMPLATES.filter((t) => buyerBrand(t) === g).map((t) => (
         <button
           key={t.id}
           onClick={() => onPickProduct(t)}
@@ -5200,13 +5236,13 @@ function BuyerSidebar({ lib, folderId, setFolderId, cloudId, onOpenItem, onNewPr
         >
           <ProductThumb type={t.type} tpl={t} />
           <span className="min-w-0">
-            <span className="block text-xs font-medium text-gray-900 truncate">{tr(t.name)}</span>
+            <span className="block text-xs font-medium text-gray-900 truncate">{g === 'HOMEDANT HOUSE' ? tr(t.name) : buyerShortName(t)}</span>
             <span className="block text-[11px] text-gray-500">
               {t.defaultSize.width}×{t.defaultSize.depth}×{t.defaultSize.height}mm
             </span>
           </span>
         </button>
-      ))}
+      ))])}
 
       {ask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.2)' }} onClick={() => setAsk(null)}>
@@ -6740,7 +6776,7 @@ function BoothSimulator() {
     x.textBaseline = 'middle';
     x.fillStyle = '#111111';
     x.font = `600 ${Math.round(34 * k)}px Arial, sans-serif`;
-    const name = tpl.name.replace(/^House /, 'HOMEDANT HOUSE ');
+    const name = buyerTitle(tpl);
     x.fillText(name, pad, y + lh);
     x.fillStyle = '#555555';
     x.font = `${Math.round(24 * k)}px Arial, sans-serif`;
@@ -6752,7 +6788,8 @@ function BoothSimulator() {
       pad,
       y + lh * 2
     );
-    x.fillText(`${tiers} tiers  ·  Double-sided plywood, ${board}`, pad, y + lh * 2.8);
+    const shelves = tpl.boardColors.includes('steel') ? 'Steel shelves in the frame color' : `Double-sided plywood, ${board}`;
+    x.fillText(`${tiers} tiers  ·  ${shelves}`, pad, y + lh * 2.8);
     x.fillStyle = '#888888';
     x.font = `${Math.round(19 * k)}px Arial, sans-serif`;
     x.fillText(
@@ -6786,7 +6823,7 @@ function BoothSimulator() {
     const a = document.createElement('a');
     a.href = c.toDataURL('image/png');
     const colorPart = buyerColors.map((col) => (SHELF_COLORS.find(([kk]) => kk === col) || [col.replace('#', '')])[0]).join('-');
-    a.download = `HOMEDANT_${tpl.name.replace(/\s+/g, '')}_${buyerBase.width}x${buyerBase.depth}x${buyerBase.height}_${colorPart}.png`;
+    a.download = `${buyerTitle(tpl).replace(/\s+/g, '')}_${buyerBase.width}x${buyerBase.depth}x${buyerBase.height}_${colorPart}.png`;
     a.click();
   };
 
@@ -6888,7 +6925,7 @@ function BoothSimulator() {
   const currentWork = () =>
     BUYER_MODE
       ? {
-          name: `${buyerBase ? buyerBase.name : ''} · ${buyerColors.map((c) => colorLabel(c).split(' #')[0]).join(', ')}`,
+          name: `${buyerBase ? buyerTitle(PRODUCT_LIBRARY.find((t) => t.id === buyerBase.productId) || { name: buyerBase.name, brand: '', id: '' }) : ''} · ${buyerColors.map((c) => colorLabel(c).split(' #')[0]).join(', ')}`,
           data: { base: buyerBase, compare: buyerCompare },
           thumbnail: makeThumb(),
         }
@@ -8029,8 +8066,26 @@ function NumInput({ label, valueMM, unit, onChange }) {
 }
 
 const BUYER_TEMPLATES = PRODUCT_LIBRARY.filter(
-  (t) => t.brand === 'HOMEDANT HOUSE' && t.type !== 'cabinet'
+  (t) => (t.brand === 'HOMEDANT HOUSE' && t.type !== 'cabinet') || (t.brand === 'SPEEDRACK' && !t.hidden)
 );
+/* Buyer-facing names. Buyer material goes overseas, where the SPEEDRACK
+   line is sold as HOMEDANT and the light rack as MAX 200, so the word
+   Speedrack never appears in the buyer app or its exports.            */
+function buyerBrand(tpl) {
+  if (!tpl) return '';
+  if (tpl.brand === 'HOMEDANT HOUSE') return 'HOMEDANT HOUSE';
+  if (tpl.id.startsWith('lr_')) return 'MAX 200';
+  return 'HOMEDANT';
+}
+// product name without the brand in front: "Shelf", "Rolling Shelf"
+function buyerShortName(tpl) {
+  return tpl.name.replace(/^House /, '').replace(/^MAX 200 /, '');
+}
+// full English name for titles and exports: "HOMEDANT Shelf", "MAX 200 Shelf"
+function buyerTitle(tpl) {
+  return `${buyerBrand(tpl)} ${buyerShortName(tpl)}`;
+}
+const BUYER_GROUPS = ['HOMEDANT HOUSE', 'HOMEDANT', 'MAX 200'];
 // a fresh product for the buyer view; keeps the colours already chosen
 function newBuyerProduct(tpl, keep) {
   const boards = tpl.boardColors;
@@ -8076,8 +8131,8 @@ function BuyerPanel({ base, tpl, setBase, compare, setCompare }) {
   return (
     <div>
       <div className="px-4 pt-3 pb-2">
-        <div className="text-[11px] text-gray-500">HOMEDANT HOUSE</div>
-        <div className="font-semibold text-sm">{tr(base.name)}</div>
+        <div className="text-[11px] text-gray-500">{buyerBrand(tpl)}</div>
+        <div className="font-semibold text-sm">{tpl.brand === 'HOMEDANT HOUSE' ? tr(base.name) : buyerShortName(tpl)}</div>
       </div>
       <Section title={tr('Size')}>
         <SizeSelect label={tr('Width')} value={base.width} options={tpl.sizeOptions.width} onChange={(v) => setBase({ width: v })} />
@@ -8132,6 +8187,11 @@ function BuyerPanel({ base, tpl, setBase, compare, setCompare }) {
           {tr('Selected')}: <span className="font-medium">{colorLabel(base.frameColor)}</span>
         </div>
       </Section>
+      {tpl.boardColors.includes('steel') ? (
+      <Section title={tr('Shelves')}>
+        <div className="text-xs text-gray-500">{tr('Steel shelves in the frame color.')}</div>
+      </Section>
+      ) : (
       <Section title={tr('Plywood board')}>
         <div className="flex gap-1.5">
           {tpl.boardColors.map((b) => (
@@ -8140,7 +8200,7 @@ function BuyerPanel({ base, tpl, setBase, compare, setCompare }) {
             </button>
           ))}
         </div>
-        {HH_LEVEL_TYPES.includes(tpl.type) && (
+        {tpl.brand === 'HOMEDANT HOUSE' && HH_LEVEL_TYPES.includes(tpl.type) && (
           <div className="flex gap-1.5 mt-2">
             {['basic', 'basket'].map((st) => (
               <button key={st} onClick={() => setBase({ shelfStyle: st })} className={btn((base.shelfStyle || 'basic') === st)}>
@@ -8150,6 +8210,7 @@ function BuyerPanel({ base, tpl, setBase, compare, setCompare }) {
           </div>
         )}
       </Section>
+      )}
       <Section title={tr('Compare colors')}>
         <div className="text-xs text-gray-500 mb-2">{tr('Add 2 to 4 colors to see them side by side.')}</div>
         <div className="flex flex-wrap gap-1.5 mb-2">
