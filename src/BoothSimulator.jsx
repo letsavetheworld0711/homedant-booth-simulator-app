@@ -1224,6 +1224,29 @@ const KO = {
   "The washing machine does not fit. Use a width of 700 or more and raise the lowest level.": "세탁기가 들어가지 않습니다. 폭을 700 이상으로 하고 가장 아래 단을 올려주세요.",
   "Laptop": "노트북",
   "Booth Staff": "부스 직원",
+  "Buyer folders": "바이어 폴더",
+  "Booth layouts": "부스 레이아웃",
+  "Shared with the team": "팀 공용",
+  "Working…": "처리 중…",
+  "Enter the team code": "팀 코드를 입력하세요",
+  "Saved layouts and proposals are shared by everyone on the team. This computer will remember the code.": "저장한 레이아웃과 제안은 팀 전체가 함께 씁니다. 이 컴퓨터는 코드를 기억합니다.",
+  "Open": "열기",
+  "The team code is not correct.": "팀 코드가 맞지 않습니다.",
+  "Could not reach the shared library.": "공용 저장소에 연결하지 못했습니다.",
+  "Save current work": "지금 작업 저장",
+  "No folder": "폴더 없음",
+  "Save as new": "새로 저장",
+  "Overwrite": "덮어쓰기",
+  "All": "전체",
+  "New folder": "새 폴더",
+  "New folder inside": "이 폴더 안에 새 폴더",
+  "Folder name": "폴더 이름",
+  "Delete this folder? What is inside moves up one level.": "이 폴더를 삭제할까요? 안에 있던 항목은 한 단계 위로 옮겨집니다.",
+  "Name": "이름",
+  "Move to folder": "폴더 이동",
+  "Nothing saved here yet.": "아직 저장된 항목이 없습니다.",
+  "Upload designs saved on this computer": "이 컴퓨터에 저장된 디자인 올리기",
+  "designs uploaded.": "개 디자인을 올렸습니다.",
   "Shelf simulator": "선반 시뮬레이터",
   "Trade show booth planner": "전시회 부스 시뮬레이터",
   "Lay out a booth for an overseas trade show: products, display items, staff and visitors.": "해외 전시회 부스를 꾸밉니다. 제품 배치, 진열 소품, 직원과 관람객까지.",
@@ -1367,8 +1390,8 @@ const BOOTH_LOOKS = {
   studio: {
     label: 'Studio',
     hint: 'Plain floor, no booth',
-    background: 0xefefec,
-    floor: 0xa9a9a6, // lands near the background tone once lit
+    background: 0xe6e6e3,
+    floor: 0xa9a9a6, // (no floor is drawn in the studio)
     grid: false,
     carpet: false,
     aisle: null,
@@ -1482,6 +1505,30 @@ function makeSpeechBubble(text, width = 0.9) {
   sprite.center.set(0.5, 0);
   sprite.renderOrder = 999;
   return sprite;
+}
+/* A soft shadow that fades out around a product's footprint, for the
+   buyer view where cast shadows are off: it keeps the product standing
+   on something without drawing a floor.                               */
+let _contactTex = null;
+function makeContactShadow(w, d) {
+  if (!_contactTex) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const x = c.getContext('2d');
+    x.filter = 'blur(22px)';
+    x.fillStyle = '#000';
+    x.fillRect(58, 58, 140, 140);
+    _contactTex = new THREE.CanvasTexture(c);
+  }
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 1.75, d * 1.75 + 0.2),
+    new THREE.MeshBasicMaterial({ map: _contactTex, transparent: true, opacity: 0.32, depthWrite: false })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.002;
+  m.renderOrder = -1;
+  m.userData.sharedAsset = true; // the texture is shared
+  return m;
 }
 const VISITOR_LINES = [
   'Hi, your items look great!',
@@ -1943,10 +1990,11 @@ function makeMaterials(p, opts = {}) {
   });
   /* Double-sided board: one face wood, the other white. Two edges are
      wood-banded (one long, one short, meeting at a corner) and the other
-     two are white. boardColor picks which face is up:
-       'wood'  -> wood up, white underneath, wood on the front + left edge
-       'white' -> the same board flipped over its long axis: white up, wood
-                  underneath, wood on the back + left edge
+     two are white. The board is laid so the two edges in view (front and
+     right, as the default camera sees them) match the face that is up:
+       'wood'  -> wood up, white underneath, wood on the front + right edge
+       'white' -> white up, wood underneath, white on the front + right
+                  edge (wood corner turned to the back left)
      `board` stays the up-face material (used on its own by cabinet tops
      etc.); the per-face set lives in board.userData.faceMats and is used
      by addBoardWithBeams.                                               */
@@ -1975,8 +2023,8 @@ function makeMaterials(p, opts = {}) {
       board.color.set(WHITE_TOP);
     }
     board.userData.faceMats = [
-      whiteSide, // +x (right edge)
-      woodSide, // -x (left edge)
+      woodUp ? woodSide : whiteSide, // +x (right edge)
+      woodUp ? whiteSide : woodSide, // -x (left edge)
       board, // top
       woodUp ? whiteSide : woodSide, // bottom
       woodUp ? woodSide : whiteSide, // +z (front edge)
@@ -3128,9 +3176,10 @@ function addHHCasters(group, inner, w, d) {
     hhAdd(inner, plateX, zinc, ex - sx * (T + 0.019), 0.035, ez - sz * (T + 0.001));
     hhAdd(inner, plateZ, zinc, ex - sx * (T + 0.001), 0.035, ez - sz * (T + 0.019));
     hhAdd(inner, base, zinc, ex - sx * 0.022, 0.0015, ez - sz * 0.022);
-    // caster under the bracket; the front pair carries the brakes
+    // caster under the bracket; the left pair (as you face it) carries
+    // the brakes, the right pair turns freely
     const angle = (sx > 0 ? Math.PI : 0) + sz * 0.4;
-    addHHCaster(group, ex - sx * 0.022, ez - sz * 0.022, angle, sz > 0);
+    addHHCaster(group, ex - sx * 0.022, ez - sz * 0.022, angle, sx < 0);
   });
 }
 
@@ -4405,6 +4454,372 @@ function buildProductMesh(p, tpl) {
 /* ============================================================
    MAIN COMPONENT
    ============================================================ */
+/* ============================================================
+   SHARED LIBRARY (Supabase)
+   Booth layouts and buyer proposals live in a shared database so the
+   whole team sees the same folders from any computer. The tables are
+   closed to the public key; every call goes through a database
+   function that first checks the team code.
+   ============================================================ */
+const CLOUD_URL = 'https://uqtmalzkgzkyjmkkrqqz.supabase.co';
+const CLOUD_KEY = 'sb_publishable_eFPznN5HbJ3EUxKraeeoIw_Rq3NarF_';
+const TEAM_CODE_KEY = 'hbs-team-code';
+function loadTeamCode() {
+  try {
+    return window.localStorage.getItem(TEAM_CODE_KEY) || '';
+  } catch (e) {
+    return '';
+  }
+}
+function storeTeamCode(code) {
+  try {
+    if (code) window.localStorage.setItem(TEAM_CODE_KEY, code);
+    else window.localStorage.removeItem(TEAM_CODE_KEY);
+  } catch (e) {
+    /* storage unavailable: the code lasts for this visit */
+  }
+}
+async function cloud(fn, args) {
+  const r = await fetch(`${CLOUD_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: CLOUD_KEY },
+    body: JSON.stringify(args),
+  });
+  const text = await r.text();
+  if (!r.ok) {
+    let msg = text;
+    try {
+      msg = JSON.parse(text).message || text;
+    } catch (e) {
+      /* not JSON */
+    }
+    const err = new Error(msg);
+    err.badCode = /invalid team code/.test(msg);
+    throw err;
+  }
+  return text ? JSON.parse(text) : null;
+}
+
+/* Folders and saved items for one kind ('booth' or 'buyer').
+   getCurrent() returns { name, data, thumbnail } for "save";
+   onOpen(item) receives a saved item with its data.               */
+function CloudLibrary({ kind, title, getCurrent, onOpen, currentId, setCurrentId, onClose, localImport }) {
+  const [code, setCode] = useState(loadTeamCode);
+  const [codeInput, setCodeInput] = useState('');
+  const [authed, setAuthed] = useState(false);
+  const [folders, setFolders] = useState([]);
+  const [items, setItems] = useState([]);
+  const [sel, setSel] = useState('all'); // 'all', 'none' or a folder id
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const cur = getCurrent();
+  const [saveName, setSaveName] = useState(cur.name);
+
+  const fail = (e) => {
+    if (e.badCode) {
+      storeTeamCode('');
+      setCode('');
+      setAuthed(false);
+      setError(tr('The team code is not correct.'));
+    } else setError(tr('Could not reach the shared library.') + ' ' + e.message);
+  };
+  const refresh = async (c = code) => {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await cloud('booth_list', { p_code: c, p_kind: kind });
+      setFolders(r.folders || []);
+      setItems(r.items || []);
+      setAuthed(true);
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+  useEffect(() => {
+    if (code) refresh(code);
+  }, []);
+
+  const submitCode = async () => {
+    const c = codeInput.trim();
+    if (!c) return;
+    setBusy(true);
+    setError('');
+    try {
+      const ok = await cloud('booth_check', { p_code: c });
+      if (!ok) {
+        setError(tr('The team code is not correct.'));
+        setBusy(false);
+        return;
+      }
+      storeTeamCode(c);
+      setCode(c);
+      await refresh(c);
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+    }
+  };
+
+  const run = async (fn, args) => {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await cloud(fn, { p_code: code, ...args });
+      await refresh();
+      return r;
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+      return null;
+    }
+  };
+  const folderId = sel === 'all' || sel === 'none' ? null : sel;
+  const saveNew = async () => {
+    const name = saveName.trim() || cur.name;
+    const r = await run('booth_save_item', {
+      p_item: { kind, name, folder_id: folderId, data: cur.data, thumbnail: cur.thumbnail },
+    });
+    if (r) setCurrentId(r.id);
+  };
+  const overwrite = async () => {
+    await run('booth_save_item', { p_item: { id: currentId, data: cur.data, thumbnail: cur.thumbnail } });
+  };
+  const open = async (it) => {
+    setBusy(true);
+    try {
+      const full = await cloud('booth_get_item', { p_code: code, p_id: it.id });
+      if (full) {
+        onOpen(full);
+        setCurrentId(full.id);
+        onClose();
+      }
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+  const newFolder = async () => {
+    const name = window.prompt(tr('Folder name'), '');
+    if (!name || !name.trim()) return;
+    const r = await run('booth_save_folder', { p_folder: { kind, name: name.trim(), parent_id: folderId } });
+    if (r) setSel(r.id);
+  };
+  const renameFolder = async (f) => {
+    const name = window.prompt(tr('Folder name'), f.name);
+    if (name && name.trim()) await run('booth_save_folder', { p_folder: { id: f.id, name: name.trim() } });
+  };
+  const deleteFolder = async (f) => {
+    if (!window.confirm(tr('Delete this folder? What is inside moves up one level.'))) return;
+    await run('booth_delete_folder', { p_id: f.id });
+    setSel('all');
+  };
+  const renameItem = async (it) => {
+    const name = window.prompt(tr('Name'), it.name);
+    if (name && name.trim()) await run('booth_save_item', { p_item: { id: it.id, name: name.trim() } });
+  };
+  const moveItem = async (it, fid) => {
+    await run('booth_save_item', { p_item: { id: it.id, folder_id: fid || '' } });
+  };
+  const deleteItem = async (it) => {
+    if (!window.confirm(tr('Delete') + ` "${it.name}"?`)) return;
+    await run('booth_delete_item', { p_id: it.id });
+    if (it.id === currentId) setCurrentId(null);
+  };
+  const importLocal = async () => {
+    if (!localImport) return;
+    setBusy(true);
+    try {
+      let n = 0;
+      for (const d of localImport.list) {
+        await cloud('booth_save_item', { p_code: code, p_item: { kind, name: d.name, folder_id: folderId, data: d.data } });
+        n++;
+      }
+      localImport.done();
+      await refresh();
+      window.alert(`${n} ${tr('designs uploaded.')}`);
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+    }
+  };
+
+  // folder tree, nested by parent
+  const childrenOf = (pid) => folders.filter((f) => (f.parent_id || null) === pid);
+  const flat = [];
+  const walk = (pid, depth) =>
+    childrenOf(pid).forEach((f) => {
+      flat.push({ f, depth });
+      walk(f.id, depth + 1);
+    });
+  walk(null, 0);
+  const shown = items.filter((it) =>
+    sel === 'all' ? true : sel === 'none' ? !it.folder_id : it.folder_id === sel
+  );
+  const rowCls = (on) =>
+    'w-full text-left text-xs px-2 py-1.5 rounded flex items-center gap-1.5 ' +
+    (on ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-white');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }} onClick={onClose}>
+      <div
+        className="bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ width: 'min(960px, 94vw)', height: 'min(640px, 90vh)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex-none flex items-center gap-2 px-4 h-12 border-b" style={{ borderColor: UI_LINE }}>
+          <FolderOpen className="w-4 h-4 text-gray-600" />
+          <span className="text-sm font-semibold">{title}</span>
+          <span className="text-xs text-gray-400">{tr('Shared with the team')}</span>
+          <span className="flex-1" />
+          {busy && <span className="text-xs text-gray-400">{tr('Working…')}</span>}
+          <button onClick={onClose} className="p-1.5 rounded text-gray-500 hover:bg-gray-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {!authed ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
+            <div className="text-sm font-medium">{tr('Enter the team code')}</div>
+            <div className="text-xs text-gray-500 text-center max-w-sm">
+              {tr('Saved layouts and proposals are shared by everyone on the team. This computer will remember the code.')}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={codeInput}
+                onChange={(e) => setCodeInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submitCode()}
+                className="text-sm border border-gray-300 rounded px-3 py-1.5 w-56"
+                autoFocus
+              />
+              <button onClick={submitCode} className="text-xs font-medium px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-700">
+                {tr('Open')}
+              </button>
+            </div>
+            {error && <div className="text-xs text-red-600">{error}</div>}
+          </div>
+        ) : (
+          <>
+            {/* save the current work */}
+            <div className="flex-none flex items-center gap-2 px-4 py-2.5 border-b" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+              <span className="text-xs text-gray-500 whitespace-nowrap">{tr('Save current work')}</span>
+              <input
+                type="text"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                className="flex-1 min-w-0 text-xs border border-gray-300 rounded px-2 py-1.5 bg-white"
+              />
+              <span className="text-xs text-gray-500 whitespace-nowrap">
+                → {folderId ? (folders.find((f) => f.id === folderId) || {}).name : tr('No folder')}
+              </span>
+              <button onClick={saveNew} className="text-xs font-medium px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-700 whitespace-nowrap">
+                {tr('Save as new')}
+              </button>
+              {currentId && items.some((it) => it.id === currentId) && (
+                <button onClick={overwrite} className="text-xs px-3 py-1.5 rounded border border-gray-300 bg-white hover:border-gray-400 whitespace-nowrap">
+                  {tr('Overwrite')} “{(items.find((it) => it.id === currentId) || {}).name}”
+                </button>
+              )}
+            </div>
+
+            <div className="flex-1 flex min-h-0">
+              {/* folders */}
+              <div className="flex-none w-60 border-r overflow-y-auto p-2" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+                <button onClick={() => setSel('all')} className={rowCls(sel === 'all')}>
+                  {tr('All')} <span className="opacity-60">{items.length}</span>
+                </button>
+                <button onClick={() => setSel('none')} className={rowCls(sel === 'none')}>
+                  {tr('No folder')} <span className="opacity-60">{items.filter((it) => !it.folder_id).length}</span>
+                </button>
+                <div className="my-2 border-t" style={{ borderColor: UI_LINE }} />
+                {flat.map(({ f, depth }) => (
+                  <div key={f.id} className="group flex items-center" style={{ paddingLeft: depth * 14 }}>
+                    <button onClick={() => setSel(f.id)} className={rowCls(sel === f.id) + ' flex-1 min-w-0'}>
+                      <FolderOpen className="w-3.5 h-3.5 flex-none" />
+                      <span className="truncate">{f.name}</span>
+                      <span className="opacity-60">{items.filter((it) => it.folder_id === f.id).length}</span>
+                    </button>
+                  </div>
+                ))}
+                <button onClick={newFolder} className="w-full mt-2 text-xs px-2 py-1.5 rounded border border-dashed border-gray-300 text-gray-600 hover:bg-white">
+                  + {folderId ? tr('New folder inside') : tr('New folder')}
+                </button>
+                {folderId && (
+                  <div className="flex gap-1 mt-1">
+                    <button onClick={() => renameFolder(folders.find((f) => f.id === folderId))} className="flex-1 text-xs px-2 py-1 rounded text-gray-600 hover:bg-white">
+                      {tr('Rename')}
+                    </button>
+                    <button onClick={() => deleteFolder(folders.find((f) => f.id === folderId))} className="flex-1 text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50">
+                      {tr('Delete')}
+                    </button>
+                  </div>
+                )}
+                {localImport && localImport.list.length > 0 && (
+                  <button onClick={importLocal} className="w-full mt-4 text-[11px] px-2 py-1.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-left">
+                    {tr('Upload designs saved on this computer')} ({localImport.list.length})
+                  </button>
+                )}
+              </div>
+
+              {/* items */}
+              <div className="flex-1 overflow-y-auto p-3">
+                {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
+                {shown.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-xs text-gray-400">{tr('Nothing saved here yet.')}</div>
+                ) : (
+                  <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
+                    {shown.map((it) => (
+                      <div key={it.id} className={'rounded-lg border bg-white overflow-hidden ' + (it.id === currentId ? 'border-gray-900' : 'border-gray-200')}>
+                        <button onClick={() => open(it)} className="block w-full aspect-[16/10] bg-gray-100" title={tr('Open')}>
+                          {it.thumbnail ? (
+                            <img src={it.thumbnail} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <Box className="w-6 h-6 mx-auto text-gray-300" />
+                          )}
+                        </button>
+                        <div className="p-2">
+                          <div className="text-xs font-medium text-gray-900 truncate">{it.name}</div>
+                          <div className="text-[11px] text-gray-400">{new Date(it.updated_at).toLocaleString()}</div>
+                          <div className="flex items-center gap-1 mt-1.5">
+                            <button onClick={() => open(it)} className="text-[11px] px-1.5 py-0.5 rounded bg-gray-900 text-white">
+                              {tr('Open')}
+                            </button>
+                            <button onClick={() => renameItem(it)} className="text-[11px] px-1.5 py-0.5 rounded border border-gray-300 text-gray-700">
+                              {tr('Rename')}
+                            </button>
+                            <select
+                              value={it.folder_id || ''}
+                              onChange={(e) => moveItem(it, e.target.value)}
+                              title={tr('Move to folder')}
+                              className="flex-1 min-w-0 text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-white"
+                            >
+                              <option value="">{tr('No folder')}</option>
+                              {flat.map(({ f, depth }) => (
+                                <option key={f.id} value={f.id}>
+                                  {'\u00a0'.repeat(depth * 2)}
+                                  {f.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button onClick={() => deleteItem(it)} className="p-0.5 rounded text-gray-400 hover:text-red-600">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* Start screen: pick the booth planner or the buyer configurator. */
 function StartScreen() {
   const [lang, setLangState] = useState(loadLang);
@@ -4528,6 +4943,9 @@ function BoothSimulator() {
   // buyer configurator: one product, optionally shown in several colours
   const [buyerBase, setBuyerBase] = useState(() => (BUYER_MODE ? newBuyerProduct(BUYER_TEMPLATES[0]) : null));
   const [buyerCompare, setBuyerCompare] = useState([]);
+  // shared library: which saved item the current work came from
+  const [cloudId, setCloudId] = useState(null);
+  const [showCloud, setShowCloud] = useState(false);
   // saved designs library (persisted in localStorage)
   const [savedDesigns, setSavedDesigns] = useState([]);
   const [showLibrary, setShowLibrary] = useState(false);
@@ -4690,6 +5108,10 @@ function BoothSimulator() {
       sceneRef.current && sceneRef.current.getObjectByName('keyLight');
     // (the studio floor is huge, but its products stand in the middle)
     if (keyLight) fitShadowToBooth(keyLight, booth.style === 'studio' ? 7 : w, booth.style === 'studio' ? 5 : d, wh);
+    // buyer view shows the product alone: no floor and no cast shadows,
+    // the lights still shade its faces
+    const studio = booth.style === 'studio';
+    if (keyLight) keyLight.castShadow = !studio;
 
     // floor
     const floorGeo = new THREE.PlaneGeometry(w, d);
@@ -4704,7 +5126,7 @@ function BoothSimulator() {
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     floor.userData.isFloor = true;
-    group.add(floor);
+    if (!studio) group.add(floor);
 
     if (look.grid) {
       const grid = new THREE.GridHelper(
@@ -4963,6 +5385,7 @@ function BoothSimulator() {
           disposeGroup(mesh);
         }
         mesh = buildProductMesh(p, tpl);
+        if (BUYER_MODE) mesh.add(makeContactShadow(p.width * MM_TO_M, p.depth * MM_TO_M));
         if (p.caption) {
           const cap = makeSpeechBubble(p.caption, 0.55);
           cap.position.set(0, (p.height * MM_TO_M) + 0.12, 0);
@@ -5438,7 +5861,7 @@ function BoothSimulator() {
 
     const W = shot.width;
     const k = W / 1600; // scale for text and spacing
-    const band = Math.round(300 * k);
+    const band = Math.round(360 * k);
     const c = document.createElement('canvas');
     c.width = W;
     c.height = shot.height + band;
@@ -5473,19 +5896,15 @@ function BoothSimulator() {
       'Colors are approximate on screen. Final colors are confirmed with a physical sample.  ' +
         new Date().toISOString().slice(0, 10),
       pad,
-      y + lh * 3.2
+      y + lh * 4.4
     );
 
-    // colour swatches on the right
+    // colour swatches in a row under the size line
     const sw = Math.round(30 * k);
-    let cx = W / 2 + Math.round(60 * k);
-    let cy = y + lh * 0.9;
+    let cx = pad;
+    const cy = y + lh * 3.2;
     x.font = `${Math.round(22 * k)}px Arial, sans-serif`;
-    buyerColors.forEach((col, i) => {
-      if (i === 2) {
-        cx = W / 2 + Math.round(60 * k);
-        cy += lh * 1.25;
-      }
+    buyerColors.forEach((col) => {
       const hex = '#' + frameHexOf(col).toString(16).padStart(6, '0').toUpperCase();
       const known = SHELF_COLORS.find(([kk]) => kk === col);
       x.fillStyle = hex;
@@ -5498,7 +5917,7 @@ function BoothSimulator() {
       x.fillStyle = '#222222';
       const label = (known ? known[1] + '  ' : '') + hex;
       x.fillText(label, cx + sw + Math.round(14 * k), cy);
-      cx += Math.round(330 * k);
+      cx += sw + Math.round(28 * k) + x.measureText(label).width + Math.round(36 * k);
     });
 
     const a = document.createElement('a');
@@ -5586,89 +6005,70 @@ function BoothSimulator() {
     window.setTimeout(() => setSaveStatus(''), 1800);
   };
 
-  /* Save the current booth to the Design Library.
-     - If we're already working on a saved design (currentDesignId set AND
-       that id still exists in the library) -> overwrite that entry.
-     - Otherwise -> ask for a name and add a new entry.
-     The `silent` flag (used by Ctrl+S) skips the name prompt when we
-     already have an entry to overwrite.                                 */
-  const saveDesign = (opts = {}) => {
-    const { silent = false } = opts;
-    // does our tracked id still exist? (it may have been deleted)
-    const existing = currentDesignId
-      ? savedDesigns.find((d) => d.id === currentDesignId)
-      : null;
-
-    if (existing) {
-      // --- overwrite the existing entry, keep its id + name ---
-      const updated = {
-        ...existing,
-        savedAt: new Date().toISOString(),
-        booth: { ...booth },
-        products: products.map((p) => ({ ...p })),
-      };
-      const next = savedDesigns.map((d) =>
-        d.id === existing.id ? updated : d
-      );
-      setSavedDesigns(next);
-      persistDesigns(next);
-      flashSaved(`${tr('Saved')} “${existing.name}”`);
-      return;
-    }
-
-    // --- no existing entry -> create a new one ---
-    // (silent saves still need a name the very first time)
-    const name = window.prompt(
-      tr('Save design as:'),
-      layoutName || 'New Booth Design'
-    );
-    if (!name) return;
-    const design = {
-      id: `d_${Date.now()}`,
-      name: name.trim(),
-      savedAt: new Date().toISOString(),
-      booth: { ...booth },
-      products: products.map((p) => ({ ...p })),
-    };
-    const next = [...savedDesigns, design];
-    setSavedDesigns(next);
-    persistDesigns(next);
-    setLayoutName(name.trim());
-    setCurrentDesignId(design.id); // track it so future saves overwrite
-    if (!silent) setShowLibrary(true);
-    flashSaved(`${tr('Saved')} “${design.name}”`);
+  // small JPEG of the current view, for the library cards
+  const makeThumb = () => {
+    const renderer = rendererRef.current;
+    if (!renderer || !sceneRef.current || !cameraRef.current) return null;
+    renderer.render(sceneRef.current, cameraRef.current);
+    const src = renderer.domElement;
+    const c = document.createElement('canvas');
+    c.width = 320;
+    c.height = 200;
+    const x = c.getContext('2d');
+    const s0 = Math.max(320 / src.width, 200 / src.height);
+    const w = src.width * s0,
+      h = src.height * s0;
+    x.drawImage(src, (320 - w) / 2, (200 - h) / 2, w, h);
+    return c.toDataURL('image/jpeg', 0.72);
   };
-
-  const loadDesign = (design) => {
-    if (!design) return;
-    if (design.booth) setBooth(design.booth);
-    if (Array.isArray(design.products)) {
-      setProducts(design.products.map((p) => ({ ...p })));
+  // what "save" stores, for each app
+  const currentWork = () =>
+    BUYER_MODE
+      ? {
+          name: `${buyerBase ? buyerBase.name : ''} ${buyerColors.map((c) => colorLabel(c).split(' #')[0]).join(', ')}`.trim(),
+          data: { base: buyerBase, compare: buyerCompare },
+          thumbnail: makeThumb(),
+        }
+      : {
+          name: layoutName || 'Booth layout',
+          data: { booth: { ...booth }, products: products.map((p) => ({ ...p })), layoutName },
+          thumbnail: makeThumb(),
+        };
+  const openWork = (item) => {
+    const d = item.data || {};
+    if (BUYER_MODE) {
+      if (d.base) setBuyerBase(d.base);
+      setBuyerCompare(Array.isArray(d.compare) ? d.compare : []);
+    } else {
+      if (d.booth) setBooth(d.booth);
+      if (Array.isArray(d.products)) setProducts(d.products.map((p) => ({ ...p })));
       setSelectedId(null);
+      setLayoutName(item.name);
     }
-    if (design.name) setLayoutName(design.name);
-    setCurrentDesignId(design.id); // now editing this saved design
   };
-
-  const deleteDesign = (id) => {
-    const next = savedDesigns.filter((d) => d.id !== id);
-    setSavedDesigns(next);
-    persistDesigns(next);
-    // if we deleted the design we were tracking, forget it so the next
-    // save creates a fresh entry instead of silently failing
-    if (currentDesignId === id) setCurrentDesignId(null);
+  /* Save: overwrite the shared item this work came from, or open the
+     library to save it somewhere the first time. Ctrl+S does the same. */
+  const saveDesign = async () => {
+    const code = loadTeamCode();
+    if (cloudId && code) {
+      const cur = currentWork();
+      try {
+        await cloud('booth_save_item', { p_code: code, p_item: { id: cloudId, data: cur.data, thumbnail: cur.thumbnail } });
+        flashSaved(tr('Saved'));
+        return;
+      } catch (e) {
+        /* fall through to the library, which shows what went wrong */
+      }
+    }
+    setShowCloud(true);
   };
-
-  const renameDesign = (id) => {
-    const design = savedDesigns.find((d) => d.id === id);
-    if (!design) return;
-    const newName = window.prompt(tr('Rename design:'), design.name);
-    if (!newName) return;
-    const next = savedDesigns.map((d) =>
-      d.id === id ? { ...d, name: newName.trim() } : d
-    );
-    setSavedDesigns(next);
-    persistDesigns(next);
+  // designs saved in this browser before the shared library existed
+  const localImport = {
+    list: savedDesigns.map((d) => ({ name: d.name, data: { booth: d.booth, products: d.products, layoutName: d.name } })),
+    done: () => {
+      setSavedDesigns([]);
+      persistDesigns([]);
+    },
   };
 
   // keep the ref pointing at the latest saveDesign (closes over current state)
@@ -5827,6 +6227,23 @@ function BoothSimulator() {
               {name}
             </button>
           ))}
+          {saveStatus && (
+            <span className="text-xs text-gray-500 inline-flex items-center gap-1">
+              <Check className="w-3.5 h-3.5" /> {saveStatus}
+            </span>
+          )}
+          <button
+            onClick={() => setShowCloud(true)}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+          >
+            <FolderOpen className="w-3.5 h-3.5" /> {tr('Buyer folders')}
+          </button>
+          <button
+            onClick={() => saveDesign()}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+          >
+            <Save className="w-3.5 h-3.5" /> {tr('Save')}
+          </button>
           <button
             onClick={savePNG}
             className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 bg-white text-gray-700 hover:border-gray-400"
@@ -5862,7 +6279,7 @@ function BoothSimulator() {
               </button>
             ))}
           </aside>
-          <main className="flex-1 relative" style={{ backgroundColor: '#ebebe8' }}>
+          <main className="flex-1 relative" style={{ backgroundColor: '#e6e6e3' }}>
             <div ref={mountRef} className="absolute inset-0" />
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
               {[
@@ -5888,6 +6305,17 @@ function BoothSimulator() {
             />
           </aside>
         </div>
+        {showCloud && (
+          <CloudLibrary
+            kind="buyer"
+            title={tr('Buyer folders')}
+            getCurrent={currentWork}
+            onOpen={openWork}
+            currentId={cloudId}
+            setCurrentId={setCloudId}
+            onClose={() => setShowCloud(false)}
+          />
+        )}
       </div>
     );
   }
@@ -5950,7 +6378,7 @@ function BoothSimulator() {
             >
               <MenuItem
                 onClick={() => {
-                  setShowLibrary(true);
+                  setShowCloud(true);
                   setOpenMenu(null);
                 }}
               >
@@ -6326,101 +6754,6 @@ function BoothSimulator() {
             })()}
         </main>
 
-        {/* DESIGN LIBRARY DRAWER — fixed overlay so it shows regardless of
-            screen width (does not get pushed off-screen by other panels) */}
-        {showLibrary && (
-          <>
-            {/* click-away backdrop */}
-            <div
-              className="fixed inset-0 z-40"
-              style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}
-              onClick={() => setShowLibrary(false)}
-            />
-            <aside className="fixed top-0 right-0 z-50 h-full w-72 border-l border-gray-300 bg-white flex flex-col shadow-xl">
-              <div className="flex-none border-b border-gray-200 px-3 py-2.5 flex items-center justify-between">
-                <div className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-                  {tr('Design Library')}
-                </div>
-                <button
-                  onClick={() => setShowLibrary(false)}
-                  className="text-gray-400 hover:text-gray-700 text-xs"
-                  title={tr('Close')}
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex-none px-3 py-2 border-b border-gray-200">
-                <button
-                  onClick={() => saveDesign()}
-                  className="w-full inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 rounded bg-red-600 text-white hover:bg-red-700 transition font-medium"
-                >
-                  <Save className="w-3.5 h-3.5" /> {tr('Save Current Booth')}
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {savedDesigns.length === 0 ? (
-                  <div className="p-6 text-center text-gray-400 text-xs">
-                    {tr('No saved designs yet.')}
-                    <br />
-                    {tr('Click "Save Current Booth" to store this layout.')}
-                  </div>
-                ) : (
-                  <div className="py-1">
-                    {savedDesigns.map((d) => (
-                      <div
-                        key={d.id}
-                        className="group px-3 py-2 border-b border-gray-100 hover:bg-gray-50"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <button
-                            onClick={() => loadDesign(d)}
-                            className="flex-1 min-w-0 text-left"
-                            title={tr('Click to load this design')}
-                          >
-                            <div className="text-xs font-medium text-gray-900 truncate">
-                              {d.name}
-                            </div>
-                            <div className="text-xs text-gray-400 mt-0.5">
-                              {d.products ? d.products.length : 0}
-                              {tr(' items')} ·{' '}
-                              {new Date(d.savedAt).toLocaleDateString()}
-                            </div>
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <button
-                            onClick={() => loadDesign(d)}
-                            className="text-xs px-1.5 py-0.5 rounded border border-gray-300 hover:bg-white text-gray-700"
-                          >
-                            {tr('Load')}
-                          </button>
-                          <button
-                            onClick={() => renameDesign(d.id)}
-                            className="text-xs px-1.5 py-0.5 rounded border border-gray-300 hover:bg-white text-gray-700"
-                          >
-                            {tr('Rename')}
-                          </button>
-                          <button
-                            onClick={() => deleteDesign(d.id)}
-                            className="text-xs px-1.5 py-0.5 rounded border border-gray-300 hover:bg-red-50 hover:border-red-300 text-red-600"
-                          >
-                            {tr('Delete')}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex-none border-t border-gray-200 px-3 py-2 bg-gray-50">
-                <div className="text-xs text-gray-400 leading-snug">
-                  {tr('Designs are stored in this browser only.')}
-                </div>
-              </div>
-            </aside>
-          </>
-        )}
-
         {/* RIGHT PANEL */}
         <aside className="flex-none w-80 border-l flex flex-col" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
           {!selected ? (
@@ -6439,6 +6772,18 @@ function BoothSimulator() {
           )}
         </aside>
       </div>
+      {showCloud && (
+        <CloudLibrary
+          kind="booth"
+          title={tr('Booth layouts')}
+          getCurrent={currentWork}
+          onOpen={openWork}
+          currentId={cloudId}
+          setCurrentId={setCloudId}
+          onClose={() => setShowCloud(false)}
+          localImport={localImport}
+        />
+      )}
     </div>
   );
 }
