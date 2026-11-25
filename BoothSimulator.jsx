@@ -21,6 +21,12 @@ import {
   ChevronRight,
   Maximize2,
   FilePlus,
+  Settings,
+  X,
+  FolderOpen,
+  Footprints,
+  Check,
+  Pencil,
 } from 'lucide-react';
 
 /* ============================================================
@@ -36,8 +42,22 @@ const SPEEDRACK_SIZES = {
 
 const HOMEDANT_HOUSE_SIZES = {
   width: [300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200],
-  depth: [300, 400, 500, 600, 700],
+  depth: [300, 400, 450, 500, 600, 700],
   height: [600, 750, 900, 1050, 1200, 1350, 1500, 1650, 1800, 1950, 2100],
+};
+
+// perforated beams come in 300 to 900 mm lengths
+const HOMEDANT_PERF_SIZES = {
+  ...HOMEDANT_HOUSE_SIZES,
+  width: HOMEDANT_HOUSE_SIZES.width.filter((v) => v <= 900),
+};
+
+// MAX 200 (light rack): beams 700-1500, depth supports 300/450/600,
+// posts 900-2400 (from the part files)
+const LR_SIZES = {
+  width: [700, 900, 1200, 1500],
+  depth: [300, 450, 600],
+  height: [900, 1200, 1500, 1800, 2100, 2400],
 };
 
 const EXHIBITION_SIZES = {
@@ -59,7 +79,7 @@ const PRODUCT_LIBRARY = [
     type: 'shelf',
     defaultSize: { width: 900, depth: 400, height: 1800 },
     sizeOptions: SPEEDRACK_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 2,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -75,6 +95,8 @@ const PRODUCT_LIBRARY = [
   {
     id: 'sp_heavy',
     brand: 'SPEEDRACK',
+    hidden: true, // old model, not rebuilt from the part files yet
+    legacy: true,
     category: 'Heavy Duty Shelf',
     name: 'Heavy Duty Shelf',
     type: 'heavy',
@@ -90,6 +112,8 @@ const PRODUCT_LIBRARY = [
   {
     id: 'sp_washer',
     brand: 'SPEEDRACK',
+    hidden: true,
+    legacy: true,
     category: 'Washing Machine Shelf',
     name: 'Washer / Dryer Shelf',
     type: 'frame_open',
@@ -110,7 +134,7 @@ const PRODUCT_LIBRARY = [
     type: 'shelf',
     defaultSize: { width: 300, depth: 300, height: 1800 },
     sizeOptions: SPEEDRACK_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 5,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -155,13 +179,42 @@ const PRODUCT_LIBRARY = [
     type: 'rolling',
     defaultSize: { width: 600, depth: 400, height: 900 },
     sizeOptions: SPEEDRACK_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 3,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
     addOns: ['additional shelf', 'handle'],
   },
 
+  // === MAX 200 (light rack) ===
+  {
+    id: 'lr_shelf',
+    brand: 'SPEEDRACK',
+    category: 'MAX 200',
+    name: 'MAX 200 Shelf',
+    type: 'shelf',
+    defaultSize: { width: 900, depth: 450, height: 1800 },
+    sizeOptions: LR_SIZES,
+    tierOptions: [2, 3, 4, 5, 6],
+    defaultTier: 5,
+    frameColors: ['white', 'black'],
+    boardColors: ['steel'],
+    addOns: [],
+  },
+  {
+    id: 'lr_rolling',
+    brand: 'SPEEDRACK',
+    category: 'MAX 200',
+    name: 'MAX 200 Rolling Shelf',
+    type: 'rolling',
+    defaultSize: { width: 900, depth: 450, height: 1800 },
+    sizeOptions: LR_SIZES,
+    tierOptions: [2, 3, 4, 5, 6],
+    defaultTier: 5,
+    frameColors: ['white', 'black'],
+    boardColors: ['steel'],
+    addOns: [],
+  },
   // === HOMEDANT HOUSE ===
   {
     id: 'hh_shelf',
@@ -171,7 +224,7 @@ const PRODUCT_LIBRARY = [
     type: 'shelf',
     defaultSize: { width: 900, depth: 400, height: 1800 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 2,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -201,7 +254,7 @@ const PRODUCT_LIBRARY = [
     type: 'shelf',
     defaultSize: { width: 300, depth: 300, height: 1800 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 4,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -262,7 +315,7 @@ const PRODUCT_LIBRARY = [
     type: 'rolling',
     defaultSize: { width: 600, depth: 400, height: 900 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 3,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -275,8 +328,39 @@ const PRODUCT_LIBRARY = [
     category: 'Pegboard Shelf',
     name: 'House Pegboard Shelf',
     type: 'pegboard',
+    defaultSize: { width: 900, depth: 400, height: 1800 },
+    sizeOptions: HOMEDANT_PERF_SIZES,
+    tierOptions: [3, 4, 5, 6, 7, 8],
+    defaultTier: 4,
+    frameColors: ['black', 'white'],
+    boardColors: ['wood', 'white'],
+    addOns: [],
+  },
+
+  {
+    id: 'hh_trolley',
+    brand: 'HOMEDANT HOUSE',
+    category: 'Trolley',
+    name: 'House Trolley',
+    type: 'trolley',
     defaultSize: { width: 600, depth: 300, height: 900 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
+    tierOptions: [3, 4],
+    defaultTier: 4,
+    frameColors: ['black', 'white'],
+    boardColors: ['wood', 'white'],
+    addOns: [],
+  },
+
+  {
+    id: 'hh_perf_trolley',
+    brand: 'HOMEDANT HOUSE',
+    category: 'Perforated Trolley',
+    name: 'House Perforated Trolley',
+    type: 'trolley',
+    perforated: true,
+    defaultSize: { width: 600, depth: 300, height: 900 },
+    sizeOptions: HOMEDANT_PERF_SIZES,
     tierOptions: [3, 4],
     defaultTier: 4,
     frameColors: ['black', 'white'],
@@ -357,6 +441,37 @@ const PRODUCT_LIBRARY = [
     defaultTier: 1,
     frameColors: ['black', 'white'],
     boardColors: ['black', 'white'],
+    addOns: [],
+  },
+
+  {
+    id: 'ex_staff',
+    brand: 'Exhibition',
+    category: 'Booth Staff',
+    name: 'Booth Staff',
+    type: 'staff',
+    defaultSize: { width: 500, depth: 300, height: 1750 },
+    sizeOptions: { width: [500], depth: [300], height: [1600, 1650, 1700, 1750, 1800, 1850] },
+    tierOptions: [1],
+    defaultTier: 1,
+    frameColors: ['navy'],
+    boardColors: ['none'],
+    addOns: [],
+  },
+
+  {
+    id: 'ex_staff_lee',
+    brand: 'Exhibition',
+    category: 'Booth Staff',
+    name: 'Manager Lee',
+    type: 'staff',
+    preset: 'coat',
+    defaultSize: { width: 500, depth: 300, height: 1750 },
+    sizeOptions: { width: [500], depth: [300], height: [1600, 1650, 1700, 1750, 1800, 1850] },
+    tierOptions: [1],
+    defaultTier: 1,
+    frameColors: ['navy'],
+    boardColors: ['none'],
     addOns: [],
   },
 
@@ -726,6 +841,54 @@ const mmToInch = (mm) => +(mm / MM_PER_IN).toFixed(1);
    3D MESH BUILDER
    ============================================================ */
 const FRAME_COLORS = { black: 0x2a2a2e, white: 0xffffff };
+/* Frame colours offered in the buyer configurator. The new ones are
+   on-screen proposals, not production colours: the real powder-coat
+   shade is settled with a physical sample.                            */
+const SHELF_COLORS = [
+  ['white', 'White', 0xffffff, 'standard'],
+  ['black', 'Black', 0x2a2a2e, 'standard'],
+  ['oat', 'Oat', 0xdcd4c4, 'new'],
+  ['milktea', 'Milk tea', 0xc8b59b, 'new'],
+  ['sage', 'Sage green', 0xa7b29c, 'new'],
+  ['warmgrey', 'Warm grey', 0x9b9893, 'new'],
+  ['dustyblue', 'Dusty blue', 0x9aaab8, 'new'],
+  ['charcoal', 'Charcoal', 0x4a4c51, 'new'],
+];
+SHELF_COLORS.forEach(([k, , hex]) => {
+  FRAME_COLORS[k] = hex;
+});
+// a colour key from the list above, or a custom '#rrggbb'
+function frameHexOf(key) {
+  if (FRAME_COLORS[key] !== undefined) return FRAME_COLORS[key];
+  if (typeof key === 'string' && /^#[0-9a-f]{6}$/i.test(key)) return parseInt(key.slice(1), 16);
+  return 0x333333;
+}
+function isLightHex(hex) {
+  const r = (hex >> 16) & 255,
+    g = (hex >> 8) & 255,
+    b = hex & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55;
+}
+function colorLabel(key) {
+  const c = SHELF_COLORS.find(([k]) => k === key);
+  const hex = '#' + frameHexOf(key).toString(16).padStart(6, '0').toUpperCase();
+  return c ? `${tr(c[1])} ${hex}` : hex;
+}
+// which app opens: '?buyer' goes straight to the buyer configurator (the
+// link sent to buyers), '?booth' to the booth planner, nothing to the start
+// screen where our team picks one
+const APP_MODE =
+  typeof window === 'undefined'
+    ? 'booth'
+    : /[?&]buyer\b/.test(window.location.search)
+    ? 'buyer'
+    : /[?&]booth\b/.test(window.location.search)
+    ? 'booth'
+    : null;
+const BUYER_MODE = APP_MODE === 'buyer';
+const openApp = (mode) => {
+  window.location.search = mode ? '?' + mode : '';
+};
 const BOARD_COLORS = { wood: 0xc8a877, white: 0xffffff, black: 0x222222 };
 // The scene lights add up to about 1.46x on faces that point straight up,
 // which washed the old boards out to pale yellow. Up-facing board faces
@@ -1056,6 +1219,10 @@ const KO = {
   "House Slim Shelf": "틈새선반",
   "House Open Base Shelf": "오픈베이스 선반",
   "House Pegboard Shelf": "타공선반",
+  "House Trolley": "트롤리",
+  "House Perforated Trolley": "타공 트롤리",
+  "Trolley": "트롤리",
+  "Perforated Trolley": "타공 트롤리",
   "House Drawer Shelf": "서랍행거",
   "House Cabinet Shelf": "캐비닛 선반",
   "Shelf": "일반 선반",
@@ -1098,6 +1265,118 @@ const KO = {
   "Washing machine": "세탁기",
   "The washing machine does not fit. Use a width of 700 or more and raise the lowest level.": "세탁기가 들어가지 않습니다. 폭을 700 이상으로 하고 가장 아래 단을 올려주세요.",
   "Laptop": "노트북",
+  "Booth Staff": "부스 직원",
+  "Buyer folders": "바이어 폴더",
+  "Booth layouts": "부스 레이아웃",
+  "Shared with the team": "팀 공용",
+  "Working…": "처리 중…",
+  "Enter the team code": "팀 코드를 입력하세요",
+  "Saved layouts and proposals are shared by everyone on the team. This computer will remember the code.": "저장한 레이아웃과 제안은 팀 전체가 함께 씁니다. 이 컴퓨터는 코드를 기억합니다.",
+  "Open": "열기",
+  "The team code is not correct.": "팀 코드가 맞지 않습니다.",
+  "Could not reach the shared library.": "공용 저장소에 연결하지 못했습니다.",
+  "Save current work": "지금 작업 저장",
+  "No folder": "폴더 없음",
+  "Save as new": "새로 저장",
+  "Overwrite": "덮어쓰기",
+  "All": "전체",
+  "New folder": "새 폴더",
+  "New folder inside": "이 폴더 안에 새 폴더",
+  "Folder name": "폴더 이름",
+  "MAX 200 Shelf": "경량랙",
+  "MAX 200 Rolling Shelf": "경량랙 바퀴형",
+  "MAX 200": "경량랙",
+  "steel": "스틸",
+  "Buyers": "바이어",
+  "Buyer name": "바이어 이름",
+  "New buyer folder": "새 바이어 폴더",
+  "New proposal for this buyer": "이 바이어에 새 제안",
+  "Manage folders": "폴더 관리",
+  "Click to start a new proposal": "누르면 새 제안으로 시작",
+  "No buyer selected": "바이어 선택 안 함",
+  "New proposal (not saved)": "새 제안 (저장 안 됨)",
+  "Outer size": "실제 외곽 치수",
+  "Cancel": "취소",
+  "will be deleted for everyone on the team.": "항목을 삭제합니다. 팀 전체에서 지워집니다.",
+  "Delete this folder? What is inside moves up one level.": "이 폴더를 삭제할까요? 안에 있던 항목은 한 단계 위로 옮겨집니다.",
+  "Name": "이름",
+  "Move to folder": "폴더 이동",
+  "Nothing saved here yet.": "아직 저장된 항목이 없습니다.",
+  "Upload designs saved on this computer": "이 컴퓨터에 저장된 디자인 올리기",
+  "designs uploaded.": "개 디자인을 올렸습니다.",
+  "Shelf simulator": "선반 시뮬레이터",
+  "Trade show booth planner": "전시회 부스 시뮬레이터",
+  "Lay out a booth for an overseas trade show: products, display items, staff and visitors.": "해외 전시회 부스를 꾸밉니다. 제품 배치, 진열 소품, 직원과 관람객까지.",
+  "For our team": "사내용",
+  "Buyer proposal configurator": "바이어 제안 시뮬레이터",
+  "Set a shelf size and colors, compare colors side by side, and export a proposal image for a buyer.": "선반 사이즈와 컬러를 정하고 컬러를 나란히 비교한 뒤, 바이어에게 보낼 제안 이미지로 내보냅니다.",
+  "For our team: buyer proposals": "사내용 · 바이어 제안",
+  "Export proposal image": "제안 이미지 내보내기",
+  "Save screen": "화면 저장",
+  "Back to start": "처음 화면으로",
+  "Shelf Color Configurator": "선반 컬러 시뮬레이터",
+  "Save image": "이미지 저장",
+  "Products": "제품",
+  "Tiers": "단수",
+  "Frame color": "프레임 컬러",
+  "Standard": "기본 컬러",
+  "New color proposals": "신규 컬러 제안",
+  "Custom color": "직접 지정",
+  "Selected": "선택",
+  "Plywood board": "합판",
+  "Wood face up": "우드 면 위로",
+  "White face up": "화이트 면 위로",
+  "Steel (frame color)": "스틸 (프레임 색)",
+  "Wood": "우드",
+  "Compare colors": "컬러 비교",
+  "Add 2 to 4 colors to see them side by side.": "2~4개 컬러를 담으면 나란히 비교해서 보여줍니다.",
+  "Add selected color": "선택한 컬러 담기",
+  "Clear": "비우기",
+  "Colors on screen are approximate. Final colors are confirmed with a physical sample.": "화면 색상은 근사치입니다. 최종 색상은 실물 샘플로 확정합니다.",
+  "Oat": "오트",
+  "White": "화이트",
+  "Black": "블랙",
+  "Milk tea": "밀크티",
+  "Sage green": "세이지 그린",
+  "Warm grey": "웜 그레이",
+  "Dusty blue": "더스티 블루",
+  "Charcoal": "차콜",
+  "Basic": "기본",
+  "Levels": "단",
+  "Display": "진열",
+  "Enter position": "위치 직접 입력",
+  "Rotate": "회전",
+  "In this booth": "부스에 놓인 제품",
+  "Click a product here or in the 3D view to edit it.": "여기나 3D 화면에서 제품을 누르면 편집할 수 있습니다.",
+  "Add products from the list on the left.": "왼쪽 목록에서 제품을 추가하세요.",
+  "Tip: drag a board of the selected shelf up or down in the 3D view.": "팁: 3D 화면에서 선택한 선반의 합판을 위아래로 끌어도 됩니다.",
+  "Show name": "전시회 이름",
+  "Type the show name": "전시회 이름 입력",
+  "My designs": "내 디자인",
+  "Export": "내보내기",
+  "Save": "저장",
+  "Design library": "디자인 보관함",
+  "Open JSON file": "JSON 파일 열기",
+  "Current view (PNG)": "현재 화면 (PNG)",
+  "Front, top and 45° (3 PNGs)": "정면·위·45° (PNG 3장)",
+  "Layout file (JSON)": "레이아웃 파일 (JSON)",
+  "Language": "언어",
+  "Booth settings": "부스 설정",
+  "Size": "크기",
+  "Unit": "단위",
+  "New layout": "새 레이아웃",
+  "Manager Lee": "이과장",
+  "Staff": "직원",
+  "Name tag": "이름표",
+  "Speech bubble": "말풍선",
+  "Glasses": "안경",
+  "Shirt": "상의",
+  "Hair": "머리",
+  "short": "짧은 머리",
+  "parted": "가르마",
+  "navy": "네이비",
+  "grey": "그레이",
+  "blue": "블루",
   "TV": "TV",
   "Hanger bars": "행거봉 수",
   "Choose an item for each spot, left to right. Level 1 is the lowest.": "칸마다 놓을 물건을 고르세요. 왼쪽부터 순서대로이고, 1번이 가장 아랫단입니다.",
@@ -1137,13 +1416,18 @@ function loadLang() {
    'dark'   - dark hall floor with a blue aisle, like a convention centre
    Colours are material colours; up-facing surfaces read about 1.46x
    brighter on screen under the scene lights.                          */
+// UI tones: panels a pale grey, the 3D view a step darker so white walls
+// stand out, white for anything you can click or type into
+const UI_PANEL = '#f7f7f5';
+const UI_LINE = '#e3e3df';
+
 // look used for new booths and for saved layouts made before looks existed
 const DEFAULT_LOOK = 'carpet';
 const BOOTH_LOOKS = {
   plan: {
     label: 'Plan',
     hint: 'White floor with grid',
-    background: 0xf3f4f6,
+    background: 0xe4e5e8,
     floor: 0xfafafa,
     grid: true,
     carpet: false,
@@ -1153,12 +1437,22 @@ const BOOTH_LOOKS = {
   carpet: {
     label: 'Carpet',
     hint: 'Grey carpet, white walls',
-    background: 0xd9dbdf,
+    background: 0xdcdde0,
     floor: 0x6a6c70,
     grid: false,
     carpet: true,
     aisle: 0x55575b,
     sign: true,
+  },
+  studio: {
+    label: 'Studio',
+    hint: 'Plain floor, no booth',
+    background: 0xe6e6e3,
+    floor: 0xa9a9a6, // (no floor is drawn in the studio)
+    grid: false,
+    carpet: false,
+    aisle: null,
+    sign: false,
   },
   dark: {
     label: 'Dark hall',
@@ -1224,6 +1518,100 @@ function makeLogoSign(width) {
    walk through the products, and they give a sense of human scale.
    Returns the group to add to the scene and a tick(dt) to call every
    frame.                                                              */
+/* A speech bubble that always faces the camera and draws on top, so it
+   is never hidden behind shelves. Returns a sprite about `width` metres
+   wide, its tail pointing down at y = 0.                               */
+function makeSpeechBubble(text, width = 0.9) {
+  const c = document.createElement('canvas');
+  const x = c.getContext('2d');
+  const font = 'bold 44px Arial, "Malgun Gothic", sans-serif';
+  x.font = font;
+  const tw = Math.min(900, Math.ceil(x.measureText(text).width));
+  c.width = tw + 80;
+  c.height = 150;
+  x.font = font;
+  const W = c.width,
+    bh = 104,
+    r = 30;
+  x.fillStyle = '#ffffff';
+  x.strokeStyle = '#2b2b2b';
+  x.lineWidth = 5;
+  x.beginPath();
+  x.moveTo(r + 3, 3);
+  x.arcTo(W - 3, 3, W - 3, bh, r);
+  x.arcTo(W - 3, bh, 3, bh, r);
+  x.lineTo(W / 2 + 22, bh);
+  x.lineTo(W / 2, 146);
+  x.lineTo(W / 2 - 10, bh);
+  x.arcTo(3, bh, 3, 3, r);
+  x.arcTo(3, 3, W - 3, 3, r);
+  x.closePath();
+  x.fill();
+  x.stroke();
+  x.fillStyle = '#1a1a1a';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.fillText(text, W / 2, bh / 2 + 2, W - 50);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true })
+  );
+  const w = Math.min(1.6, width * (W / 520));
+  sprite.scale.set(w, (w * c.height) / W, 1);
+  sprite.center.set(0.5, 0);
+  sprite.renderOrder = 999;
+  return sprite;
+}
+/* A soft shadow that fades out around a product's footprint, for the
+   buyer view where cast shadows are off: it keeps the product standing
+   on something without drawing a floor.                               */
+let _contactTex = null;
+function makeContactShadow(w, d) {
+  if (!_contactTex) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 256;
+    const x = c.getContext('2d');
+    x.filter = 'blur(22px)';
+    x.fillStyle = '#000';
+    x.fillRect(58, 58, 140, 140);
+    _contactTex = new THREE.CanvasTexture(c);
+  }
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(w * 1.75, d * 1.75 + 0.2),
+    new THREE.MeshBasicMaterial({ map: _contactTex, transparent: true, opacity: 0.32, depthWrite: false })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.002;
+  m.renderOrder = -1;
+  m.userData.sharedAsset = true; // the texture is shared
+  return m;
+}
+const VISITOR_LINES = [
+  'Hi, your items look great!',
+  'Love these shelves!',
+  'Is this all steel?',
+  'Can I see the catalog?',
+  'Wow, so sturdy!',
+];
+
+/* Clamp a product's position so its whole footprint stays inside the
+   booth (bw x bd in mm). Rotations are in 90 degree steps.           */
+function clampToBooth(p, bw, bd) {
+  const turned = Math.round((p.rotation || 0) / 90) % 2 === 1;
+  const hw = ((turned ? p.depth : p.width) * MM_TO_M) / 2;
+  const hd = ((turned ? p.width : p.depth) * MM_TO_M) / 2;
+  const lim = (v, h, half) => (half - h <= 0 ? 0 : Math.max(-half + h, Math.min(half - h, v)));
+  return {
+    x: lim(p.position.x, hw, (bw * MM_TO_M) / 2),
+    z: lim(p.position.z, hd, (bd * MM_TO_M) / 2),
+  };
+}
+const keepIn = (p, booth) => {
+  const c = clampToBooth(p, booth.width, booth.depth);
+  return c.x === p.position.x && c.z === p.position.z ? p : { ...p, position: c };
+};
+
 function createVisitors(w, d) {
   const group = new THREE.Group();
   const count = Math.max(4, Math.min(9, Math.round(w) + 2));
@@ -1273,8 +1661,13 @@ function createVisitors(w, d) {
     const armL = add(armGeo, top, -0.215, 1.41, 0);
     const armR = add(armGeo, top, 0.215, 1.41, 0);
     add(headGeo, skin, 0, 1.585, 0);
+    // what they say while stopped at the booth
+    const bubble = makeSpeechBubble(VISITOR_LINES[i % VISITOR_LINES.length], 0.8);
+    bubble.position.set(0, 1.78, 0);
+    bubble.visible = false;
+    g.add(bubble);
     g.scale.setScalar(rnd(0.92, 1.07)); // about 1.55 m to 1.8 m tall
-    const v = { g, legL, legR, armL, armR, phase: rnd(0, 6), yaw: 0, lane: i };
+    const v = { g, legL, legR, armL, armR, bubble, phase: rnd(0, 6), yaw: 0, lane: i };
     reset(v, true);
     v.yaw = v.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
     group.add(g);
@@ -1284,6 +1677,8 @@ function createVisitors(w, d) {
   const tick = (dt) => {
     for (const v of visitors) {
       let targetYaw;
+      // most visitors say something while they stop and look
+      v.bubble.visible = v.mode === 'look' && v.talk && v.wait > 0.6;
       if (v.mode === 'walk') {
         const before = v.x;
         v.x += v.dir * v.speed * dt;
@@ -1294,6 +1689,7 @@ function createVisitors(w, d) {
           (before - v.stopX) * (v.x - v.stopX) <= 0 // just reached the spot
         ) {
           v.mode = 'look';
+          v.talk = Math.random() < 0.7;
           v.wait = rnd(3, 8);
           v.stopX = null;
         }
@@ -1325,7 +1721,13 @@ function createVisitors(w, d) {
    now: put 'SPEEDRACK' back at the front of this list to show it again.
    Its products and builders are untouched, so saved layouts that already
    contain SPEEDRACK items still load and render.                       */
-const LIBRARY_BRANDS = ['HOMEDANT HOUSE', 'Exhibition'];
+const LIBRARY_BRANDS = ['HOMEDANT HOUSE', 'SPEEDRACK', 'Exhibition'];
+/* Products built on the shared frame system (posts, beams, levels you can
+   drag, display items): every HOMEDANT HOUSE product and the rebuilt
+   SPEEDRACK / MAX 200 ones.                                          */
+function isLevelProduct(tpl) {
+  return !!tpl && (tpl.brand === 'HOMEDANT HOUSE' || (tpl.brand === 'SPEEDRACK' && !tpl.legacy));
+}
 
 /* ----- HOMEDANT HOUSE shelf levels -----
    Each level has its own height and its own style. `h` is in mm from the
@@ -1335,9 +1737,9 @@ const LIBRARY_BRANDS = ['HOMEDANT HOUSE', 'Exhibition'];
    were made for; when either changes the levels fall back to an even
    spread. Beams hook into the post slots, so heights move in slot-pitch
    steps.                                                               */
-const HH_LEVEL_TYPES = ['shelf', 'open_base', 'garment', 'rolling', 'pegboard'];
+const HH_LEVEL_TYPES = ['shelf', 'open_base', 'garment', 'rolling', 'pegboard', 'trolley'];
 // products that can be dressed with display items
-const HH_ITEM_TYPES = ['shelf', 'open_base', 'garment', 'rolling', 'pegboard', 'drawer'];
+const HH_ITEM_TYPES = ['shelf', 'open_base', 'garment', 'rolling', 'pegboard', 'drawer', 'trolley'];
 const HH_DRAWER_TOP = 515; // board over the two drawers of the drawer hanger
 const HH_LEVEL_MIN = 112; // lowest level: 50 gap + 53 beam + 9 board
 const HH_LEVEL_STEP = 33; // slot pitch
@@ -1345,8 +1747,64 @@ const HH_LEVEL_GAP = 99; // minimum distance between two levels
 function hhLevelKey(p) {
   return `${p.tier}-${p.height}`;
 }
+/* Frame specs. HH is the HOMEDANT HOUSE frame further down; these two
+   come from the SPEEDRACK and MAX 200 part files (sizes in metres):
+   - SPEEDRACK: single-layer L-angle post 33.6 mm, 1.5 mm steel, keyhole
+     slots 13.4 x 19.9 mm every 30 mm on both faces; beam 53 mm with a
+     15 mm lip on top, hooked in behind the post faces; L-shaped plastic
+     foot 39.6 mm, 20 mm tall. homedant.com lists the SS shelves 12 mm
+     wider and deeper than the size name, 11 mm taller (posts stand
+     above the top board), with 0.36" (9 mm) boards.
+   - MAX 200: C-channel post 42.1 x 45.3 mm, open toward the inside,
+     slots 11.3 x 15.4 mm every 30 mm on its front and back faces; 87 mm
+     C-beams front and back at the top and bottom levels, steel trays with
+     folded edges in between; square plastic foot 51 x 56 mm.          */
+const SP_SPEC = {
+  kind: 'sp',
+  flange: 0.0336,
+  postT: 0.0015,
+  sheet: 0.0012,
+  beamH: 0.053,
+  lip: 0.015,
+  board: 0.009,
+  bottomGap: 0.03,
+  levelMin: 92, // 30 gap + 53 beam + 9 board
+  step: 30,
+  gap: 99,
+  topRise: 0.011,
+};
+const LR_SPEC = {
+  kind: 'lr',
+  postW: 0.0421,
+  postD: 0.0453,
+  sheet: 0.0012,
+  beamH: 0.087,
+  trayLip: 0.035,
+  board: 0.002,
+  bottomGap: 0.03,
+  levelMin: 117, // 30 gap + 87 beam
+  step: 30,
+  gap: 99,
+};
+function specOfProduct(p) {
+  const id = (p && p.productId) || '';
+  if (id.startsWith('sp_')) return SP_SPEC;
+  if (id.startsWith('lr_')) return LR_SPEC;
+  return HH;
+}
+function specOf(mat) {
+  return mat && mat.userData && mat.userData.hh ? specOfProduct(mat.userData.hh.product) : HH;
+}
+// level rules (mm) for a product: lowest level, snap step, minimum gap
+function levelRule(p) {
+  const S = specOfProduct(p);
+  return S === HH
+    ? { min: HH_LEVEL_MIN, step: HH_LEVEL_STEP, gap: HH_LEVEL_GAP }
+    : { min: S.levelMin, step: S.step, gap: S.gap };
+}
 function hhDefaultLevels(p, tiers) {
   const n = tiers || p.tier || 1;
+  const LMIN = levelRule(p).min;
   // drawer hanger: one board over the drawers, one at the top
   if (p.productId === 'hh_drawer')
     return [
@@ -1354,9 +1812,9 @@ function hhDefaultLevels(p, tiers) {
       { h: p.height, style: 'basic' },
     ];
   // perforated trolley: trays below, a flat top
-  if (p.productId === 'hh_pegboard' && !p.shelfStyle)
+  if ((p.productId === 'hh_trolley' || p.productId === 'hh_perf_trolley') && !p.shelfStyle)
     return Array.from({ length: n }, (_, i) => ({
-      h: n === 1 ? p.height : Math.round(HH_LEVEL_MIN + (i / (n - 1)) * (p.height - HH_LEVEL_MIN)),
+      h: n === 1 ? p.height : Math.round(LMIN + (i / (n - 1)) * (p.height - LMIN)),
       style: i === n - 1 ? 'basic' : 'basket',
     }));
   const style = p.shelfStyle === 'basket' ? 'basket' : 'basic';
@@ -1364,9 +1822,21 @@ function hhDefaultLevels(p, tiers) {
     h:
       n === 1
         ? p.height
-        : Math.round(HH_LEVEL_MIN + (i / (n - 1)) * (p.height - HH_LEVEL_MIN)),
-    style,
+        : Math.round(LMIN + (i / (n - 1)) * (p.height - LMIN)),
+    style: specOfProduct(p) === HH ? style : 'basic',
   }));
+}
+/* Tier counts that physically fit the chosen height. Up to 5 tiers are
+   always offered (as before); 6 and up need at least 150 mm per opening. */
+const TIER_MIN_OPENING = 150;
+function tierChoices(tpl, p) {
+  return tpl.tierOptions.filter(
+    (t) => t <= 5 || (p.height - levelRule(p).min) / (t - 1) >= TIER_MIN_OPENING
+  );
+}
+function fitTier(tpl, p) {
+  const ok = tierChoices(tpl, p);
+  return ok.includes(p.tier) ? p.tier : Math.max(...ok.filter((t) => t <= p.tier), ok[0]);
 }
 function hhResolveLevels(p, tiers) {
   const n = tiers || p.tier || 1;
@@ -1463,7 +1933,177 @@ function hhAdd(group, geo, mat, x, y, z) {
   return m;
 }
 
+/* Slot pattern for SPEEDRACK / MAX 200 post faces: one 30 mm pitch per
+   tile, the keyholes cut out (transparent) so you can see through them.
+   `fromRight`: the post corner is on the right edge of the face.      */
+const _frameSlotTex = {};
+function frameSlotTexture(kind, fromRight) {
+  const key = kind + (fromRight ? 'R' : 'L');
+  if (_frameSlotTex[key]) return _frameSlotTex[key];
+  const sp = kind === 'sp';
+  const PX = 4; // px per mm
+  const faceW = sp ? 33.6 : 42.1,
+    pitch = 30;
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(faceW * PX);
+  cv.height = pitch * PX;
+  const x = cv.getContext('2d');
+  x.fillStyle = '#ffffff';
+  x.fillRect(0, 0, cv.width, cv.height);
+  const sw = sp ? 13.4 : 11.3,
+    sh = sp ? 19.9 : 15.4,
+    bottom = sp ? 4.8 : 8.3;
+  // SPEEDRACK slots sit 20.6 mm from the corner; MAX 200 ones are centred
+  const cu = sp ? (fromRight ? faceW - 20.6 : 20.6) : faceW / 2;
+  const P = (u, z) => [u * PX, (pitch - z) * PX];
+  const top = bottom + sh,
+    wide = sw / 2,
+    neck = sw * 0.29,
+    shoulder = top - sh * 0.42,
+    waist = shoulder - sh * 0.16;
+  x.globalCompositeOperation = 'destination-out';
+  x.beginPath();
+  x.moveTo(...P(cu - wide, top));
+  x.lineTo(...P(cu + wide, top));
+  x.lineTo(...P(cu + wide, shoulder));
+  x.lineTo(...P(cu + neck, waist));
+  x.lineTo(...P(cu + neck, bottom));
+  x.lineTo(...P(cu - neck, bottom));
+  x.lineTo(...P(cu - neck, waist));
+  x.lineTo(...P(cu - wide, shoulder));
+  x.closePath();
+  x.fill();
+  x.globalCompositeOperation = 'source-over';
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  _frameSlotTex[key] = tex;
+  return tex;
+}
+function slottedFaceMat(frameMat, kind, fromRight, height) {
+  const tex = frameSlotTexture(kind, fromRight).clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(1, height / 0.03);
+  return new THREE.MeshStandardMaterial({
+    color: frameMat.color.getHex(),
+    map: tex,
+    alphaTest: 0.5,
+    side: THREE.DoubleSide,
+    metalness: frameMat.metalness,
+    roughness: frameMat.roughness,
+  });
+}
+const CORNERS = [
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
+  [1, 1],
+];
+// SPEEDRACK: open L-angle, one layer of steel, slots on both faces
+function addSPPosts(group, w, d, h, frameMat) {
+  const F = SP_SPEC.flange;
+  const H = h + SP_SPEC.topRise; // posts stand a little above the top board
+  const mL = slottedFaceMat(frameMat, 'sp', false, H),
+    mR = slottedFaceMat(frameMat, 'sp', true, H);
+  const face = new THREE.PlaneGeometry(F, H);
+  CORNERS.forEach(([sx, sz]) => {
+    const ex = sx * (w / 2),
+      ez = sz * (d / 2);
+    hhAdd(group, face, sx > 0 ? mR : mL, ex - sx * (F / 2), H / 2, ez - sz * 0.0008);
+    const side = hhAdd(group, face, sz > 0 ? mR : mL, ex - sx * 0.0008, H / 2, ez - sz * (F / 2));
+    side.rotation.y = -Math.PI / 2;
+  });
+}
+// MAX 200: C-channel, closed on the outside, open toward the shelf
+function addLRPosts(group, w, d, h, frameMat) {
+  const { postW: PW, postD: PD, sheet: t } = LR_SPEC;
+  const faceMat = slottedFaceMat(frameMat, 'lr', false, h);
+  const face = new THREE.PlaneGeometry(PW, h);
+  const outer = new THREE.BoxGeometry(t, h, PD);
+  const lipW = 0.008;
+  const lip = new THREE.BoxGeometry(t, h, lipW);
+  CORNERS.forEach(([sx, sz]) => {
+    const ex = sx * (w / 2),
+      ez = sz * (d / 2);
+    hhAdd(group, outer, frameMat, ex - sx * (t / 2), h / 2, ez - sz * (PD / 2));
+    hhAdd(group, face, faceMat, ex - sx * (PW / 2), h / 2, ez - sz * 0.0006);
+    hhAdd(group, face, faceMat, ex - sx * (PW / 2), h / 2, ez - sz * (PD - 0.0006));
+    hhAdd(group, lip, frameMat, ex - sx * (PW - t / 2), h / 2, ez - sz * (lipW / 2 + 0.0006));
+    hhAdd(group, lip, frameMat, ex - sx * (PW - t / 2), h / 2, ez - sz * (PD - lipW / 2 - 0.0006));
+  });
+}
+function plasticOf(frameMat) {
+  const hex = frameMat.color.getHex();
+  const m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.8, metalness: 0 });
+  if (isLightHex(hex)) m.color.multiplyScalar(0.9);
+  return m;
+}
+// SPEEDRACK foot (안전좌): an L-shaped plastic cap around the post bottom
+function addSPFeet(group, w, d, frameMat) {
+  const m = plasticOf(frameMat);
+  const L = 0.0396,
+    H = 0.02,
+    T = 0.003;
+  const gx = new THREE.BoxGeometry(L, H, T),
+    gz = new THREE.BoxGeometry(T, H, L),
+    pad = new THREE.BoxGeometry(L * 0.62, 0.004, L * 0.62);
+  CORNERS.forEach(([sx, sz]) => {
+    const ex = sx * (w / 2),
+      ez = sz * (d / 2);
+    hhAdd(group, gx, m, ex - sx * (L / 2), H / 2, ez - sz * (T / 2));
+    hhAdd(group, gz, m, ex - sx * (T / 2), H / 2, ez - sz * (L / 2));
+    hhAdd(group, pad, m, ex - sx * (L * 0.31), 0.002, ez - sz * (L * 0.31));
+  });
+}
+// MAX 200 foot: a square plastic cap the post stands in
+function addLRFeet(group, w, d, frameMat) {
+  const m = plasticOf(frameMat);
+  const { postW: PW, postD: PD } = LR_SPEC;
+  const g = new THREE.BoxGeometry(PW + 0.009, 0.024, PD + 0.011);
+  CORNERS.forEach(([sx, sz]) => {
+    hhAdd(group, g, m, sx * (w / 2 - PW / 2), 0.012, sz * (d / 2 - PD / 2));
+  });
+}
+/* MAX 200 level. Top and bottom levels: 87 mm C-beams front and back
+   with a steel deck between them. Levels in between: a steel tray with
+   its front and back edges folded down, on depth supports at the sides. */
+function addLRLevel(group, w, d, yBoard, frameMat, thickness) {
+  const { postW: PW, sheet: t, beamH: BH, trayLip: TL } = LR_SPEC;
+  const cur = frameMat.userData.hh.cur || { i: 0, n: 1 };
+  const top = yBoard + thickness / 2;
+  const wi = w - 2 * PW; // between the posts
+  const hex = frameMat.color.getHex();
+  const deckTop = frameMat.clone();
+  if (isLightHex(hex)) deckTop.color.setHex(hex).multiplyScalar(0.86);
+  const deckMat = [frameMat, frameMat, deckTop, frameMat, frameMat, frameMat];
+  const isEnd = cur.i === 0 || cur.i === cur.n - 1;
+  if (isEnd) {
+    const D = 0.0104; // beam depth
+    [-1, 1].forEach((s) => {
+      const z = s * (d / 2);
+      hhAdd(group, new THREE.BoxGeometry(wi, BH, t), frameMat, 0, top - BH / 2, z - s * (t / 2));
+      hhAdd(group, new THREE.BoxGeometry(wi, t, D), frameMat, 0, top - t / 2, z - s * (D / 2));
+      hhAdd(group, new THREE.BoxGeometry(wi, t, D), frameMat, 0, top - BH + t / 2, z - s * (D / 2));
+      hhAdd(group, new THREE.BoxGeometry(wi, 0.006, t), frameMat, 0, top - BH + 0.004, z - s * (D - t / 2));
+    });
+    hhAdd(group, new THREE.BoxGeometry(wi - 0.002, 0.0015, d - 2 * D), deckMat, 0, top - 0.00075, 0);
+  } else {
+    hhAdd(group, new THREE.BoxGeometry(wi - 0.002, 0.0015, d - 0.003), deckMat, 0, top - 0.00075, 0);
+    [-1, 1].forEach((s) => {
+      hhAdd(group, new THREE.BoxGeometry(wi - 0.002, TL, t), frameMat, 0, top - TL / 2, s * (d / 2 - 0.0015 - t / 2));
+      hhAdd(group, new THREE.BoxGeometry(wi - 0.002, t, 0.008), frameMat, 0, top - TL + t / 2, s * (d / 2 - 0.0055));
+      // depth support under the tray at each side
+      hhAdd(group, new THREE.BoxGeometry(t, 0.025, d - 0.01), frameMat, s * (wi / 2 - 0.0015), top - 0.0015 - 0.0125, 0);
+      hhAdd(group, new THREE.BoxGeometry(0.02, t, d - 0.01), frameMat, s * (wi / 2 - 0.011), top - 0.0015 - 0.025, 0);
+    });
+  }
+}
+
 function addHHPosts(group, w, d, h, frameMat) {
+  const S = specOf(frameMat);
+  if (S.kind === 'sp') return addSPPosts(group, w, d, h, frameMat);
+  if (S.kind === 'lr') return addLRPosts(group, w, d, h, frameMat);
   const { flange: F, postT: T, sheet: t } = HH;
   const slotMat = frameMat.userData.hh.slotMat;
   slotMat.map.repeat.set(1, h / HH.slotPitch);
@@ -1473,8 +2113,24 @@ function addHHPosts(group, w, d, h, frameMat) {
   const innerX = new THREE.BoxGeometry(innerW, h, t);
   const innerZ = new THREE.BoxGeometry(t, h, innerW);
   const hem = new THREE.CylinderGeometry(T / 2, T / 2, h, 10);
-  const capX = new THREE.BoxGeometry(F, 0.002, T);
-  const capZ = new THREE.BoxGeometry(T, 0.002, F - T);
+  // safety cap: a plastic L sleeve over the post top, in the frame colour.
+  // Its top face is toned down so a light colour doesn't burn out to white
+  // under the top light (same trick as the boards).
+  const CAP_H = 0.016,
+    CAP_E = 0.0012; // sits a hair proud of the post
+  const capX = new THREE.BoxGeometry(F + CAP_E, CAP_H, T + CAP_E);
+  const capZ = new THREE.BoxGeometry(T + CAP_E, CAP_H, F - T);
+  const capHex = frameMat.color.getHex();
+  const capLight = isLightHex(capHex);
+  const capSide = new THREE.MeshStandardMaterial({
+    color: capHex,
+    roughness: frameMat.roughness,
+    metalness: frameMat.metalness,
+  });
+  capSide.color.multiplyScalar(capLight ? 0.88 : 1);
+  const capTop = capSide.clone();
+  capTop.color.setHex(capHex).multiplyScalar(capLight ? 0.7 : 1);
+  const capMat = [capSide, capSide, capTop, capSide, capSide, capSide];
   [
     [-1, -1],
     [1, -1],
@@ -1507,19 +2163,16 @@ function addHHPosts(group, w, d, h, frameMat) {
     hhAdd(group, hem, frameMat, ex - sx * F, h / 2, ez - sz * (T / 2));
     hhAdd(group, hem, frameMat, ex - sx * (T / 2), h / 2, ez - sz * F);
     // top cap closing the L
-    hhAdd(group, capX, frameMat, ex - sx * (F / 2), h + 0.001, ez - sz * (T / 2));
-    hhAdd(
-      group,
-      capZ,
-      frameMat,
-      ex - sx * (T / 2),
-      h + 0.001,
-      ez - sz * (T + (F - T) / 2)
-    );
+    const capY = h + HH_CAP_RISE * MM_TO_M - CAP_H / 2; // top of the cap 11 mm above the frame
+    hhAdd(group, capX, capMat, ex - sx * (F / 2), capY, ez - sz * (T / 2));
+    hhAdd(group, capZ, capMat, ex - sx * (T / 2), capY, ez - sz * (T + (F - T) / 2));
   });
 }
 
 function addHHFeet(group, w, d, footMat) {
+  const S = specOf(footMat);
+  if (S.kind === 'sp') return addSPFeet(group, w, d, footMat);
+  if (S.kind === 'lr') return addLRFeet(group, w, d, footMat);
   const { flange: F, postT: T } = HH;
   const fh = 0.006;
   const gx = new THREE.BoxGeometry(F + 0.001, fh, T + 0.001);
@@ -1540,12 +2193,36 @@ function addHHFeet(group, w, d, footMat) {
 /* One shelf level. `yBoard` is where the board centre sits in the basic
    style; the basket style keeps the level at the same height but flips
    the beams, so the rim top lands where the board top was.            */
-function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style) {
-  const { flange: F, postT: T, sheet: t, beamH: BH, lip: LIP } = HH;
-  const basket = (style || frameMat.userData.hh.style) === 'basket';
+function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style, perfH = 0, perfUp = false) {
+  const S = specOf(frameMat);
+  if (S.kind === 'lr') return addLRLevel(group, w, d, yBoard, frameMat, thickness);
+  const { flange: F, postT: T, sheet: t, beamH: BH, lip: LIP } = S;
+  const basket = S === HH && (style || frameMat.userData.hh.style) === 'basket';
   const beamTop = basket ? yBoard + thickness / 2 : yBoard - thickness / 2;
   const beamMid = beamTop - BH / 2;
   const lipY = basket ? beamTop - BH + t / 2 : beamTop - t / 2;
+  // perforated beam (back and both ends): the same folded plate as an
+  // ordinary beam, only taller: hanging down from the board, or (trolley)
+  // rising from the beam's bottom edge
+  if (perfH > BH) {
+    const yc = perfUp ? beamTop - BH + perfH / 2 : beamTop - perfH / 2;
+    const lenX = w - 2 * T,
+      lenZ = d - 2 * T - 2 * t;
+    const hex = frameMat.color.getHex();
+    const back = new THREE.Mesh(new THREE.PlaneGeometry(lenX, perfH), hhPerfMaterial(lenX, perfH, hex, !perfUp));
+    back.position.set(0, yc, -(d / 2 - T - t / 2));
+    back.castShadow = true;
+    back.receiveShadow = true;
+    group.add(back);
+    [-1, 1].forEach((sx) => {
+      const end = new THREE.Mesh(new THREE.PlaneGeometry(lenZ, perfH), hhPerfMaterial(lenZ, perfH, hex, !perfUp));
+      end.rotation.y = Math.PI / 2;
+      end.position.set(sx * (w / 2 - T - t / 2), yc, 0);
+      end.castShadow = true;
+      end.receiveShadow = true;
+      group.add(end);
+    });
+  }
 
   const lenX = w - 2 * T; // front/back plates, ends tucked behind the posts
   const lenZ = d - 2 * T - 2 * t; // side plates fit between them
@@ -1562,9 +2239,10 @@ function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style) {
   rivetZ.rotateZ(Math.PI / 2);
 
   [-1, 1].forEach((s) => {
-    hhAdd(group, plateX, frameMat, 0, beamMid, s * zPlate);
+    // with a perforated beam only the front plate stays solid
+    if (!(perfH > BH && s < 0)) hhAdd(group, plateX, frameMat, 0, beamMid, s * zPlate);
     hhAdd(group, lipX, frameMat, 0, lipY, s * (zPlate - t / 2 - LIP / 2));
-    hhAdd(group, plateZ, frameMat, s * xPlate, beamMid, 0);
+    if (!(perfH > BH)) hhAdd(group, plateZ, frameMat, s * xPlate, beamMid, 0);
     hhAdd(group, lipZ, frameMat, s * (xPlate - t / 2 - LIP / 2), lipY, 0);
     [-1, 1].forEach((e) => {
       [-0.015, 0.015].forEach((dy) => {
@@ -1608,9 +2286,10 @@ function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style) {
    If perforated, a separate `postMat` is returned with a clone of the
    slot texture so its UV repeat can be set per post-height in addPosts. */
 function makeMaterials(p, opts = {}) {
-  const frameHex = FRAME_COLORS[p.frameColor] || 0x333333;
+  const frameHex = frameHexOf(p.frameColor);
   const boardHex = BOARD_COLORS[p.boardColor] || 0xb89968;
-  const isWhiteFrame = p.frameColor === 'white';
+  // light paint colours (white, oat...) get the matte white-paint finish
+  const isWhiteFrame = p.frameColor === 'white' || isLightHex(frameHex);
   const isWhiteBoard = p.boardColor === 'white';
 
   // White paint: low metalness + higher roughness so directional light
@@ -1627,10 +2306,11 @@ function makeMaterials(p, opts = {}) {
   });
   /* Double-sided board: one face wood, the other white. Two edges are
      wood-banded (one long, one short, meeting at a corner) and the other
-     two are white. boardColor picks which face is up:
-       'wood'  -> wood up, white underneath, wood on the front + left edge
-       'white' -> the same board flipped over its long axis: white up, wood
-                  underneath, wood on the back + left edge
+     two are white. The board is laid so the two edges in view (front and
+     right, as the default camera sees them) match the face that is up:
+       'wood'  -> wood up, white underneath, wood on the front + right edge
+       'white' -> white up, wood underneath, white on the front + right
+                  edge (wood corner turned to the back left)
      `board` stays the up-face material (used on its own by cabinet tops
      etc.); the per-face set lives in board.userData.faceMats and is used
      by addBoardWithBeams.                                               */
@@ -1659,13 +2339,23 @@ function makeMaterials(p, opts = {}) {
       board.color.set(WHITE_TOP);
     }
     board.userData.faceMats = [
-      whiteSide, // +x (right edge)
-      woodSide, // -x (left edge)
+      woodUp ? woodSide : whiteSide, // +x (right edge)
+      woodUp ? whiteSide : woodSide, // -x (left edge)
       board, // top
       woodUp ? whiteSide : woodSide, // bottom
       woodUp ? woodSide : whiteSide, // +z (front edge)
       woodUp ? whiteSide : woodSide, // -z (back edge)
     ];
+  }
+  // painted steel deck in the frame colour; the up face is toned down
+  // like the wooden boards so it doesn't wash out under the top light
+  if (p.boardColor === 'steel') {
+    board.color.setHex(frameHex);
+    board.metalness = isWhiteFrame ? 0.08 : 0.3;
+    board.roughness = 0.6;
+    const top = board.clone();
+    top.color.setHex(frameHex).multiplyScalar(0.72);
+    board.userData.faceMats = [board, board, top, board, board, board];
   }
   const foot = new THREE.MeshStandardMaterial({
     // Cap color matches frame: white frame → white cap, black frame → black cap.
@@ -1835,7 +2525,9 @@ function addBoardWithBeams(
       boardMat,
       frameMat,
       thickness,
-      opts.hhStyle
+      opts.hhStyle,
+      opts.hhPerf || 0,
+      !!opts.hhPerfUp
     );
     return;
   }
@@ -1883,7 +2575,7 @@ function addBoardWithBeams(
 }
 
 function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
-  const {
+  let {
     skipBottom = false,
     postSize = 0.025,
     thickness = 0.009,
@@ -1895,8 +2587,10 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
   // Bottom board top = bottomLift + beamH + thickness  (just above foot caps)
   // Top board top   = h
   const isHH = !!(frameMat.userData && frameMat.userData.hh);
+  const S = isHH ? specOf(frameMat) : null;
+  if (S && S.board) thickness = S.board;
   const yBoardBottom = isHH
-    ? HH.bottomGap + HH.beamH + thickness / 2
+    ? S.bottomGap + S.beamH + thickness / 2
     : bottomLift + beamH + thickness / 2;
   const yBoardTop = h - thickness / 2;
   const start = skipBottom ? 1 : 0;
@@ -1910,26 +2604,31 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
     else if (i === 0) y = yBoardBottom;
     else y = yBoardBottom + (i / (tiers - 1)) * (yBoardTop - yBoardBottom);
     if (hhLevels) y = hhLevels[i].h * MM_TO_M - thickness / 2;
+    if (isHH) frameMat.userData.hh.cur = { i, n: tiers };
+    const before = group.children.length;
     addBoardWithBeams(group, w, d, y, boardMat, frameMat, {
       postSize,
       thickness,
       beamH,
       beamW,
       hhStyle: hhLevels ? hhLevels[i].style : undefined,
+      hhPerf: isHH && frameMat.userData.hh.perf ? frameMat.userData.hh.perf[i] || 0 : 0,
+      hhPerfUp: isHH && !!frameMat.userData.hh.perfUp,
     });
+    if (hhLevels) for (let k = before; k < group.children.length; k++) group.children[k].userData.hhLevel = i;
     const hh = isHH ? frameMat.userData.hh : null;
     if (hhLevels && hh.product.showItems) {
       // dress the level: work out its board surface and the room above it
       const L = hhLevels[i];
       const basket = L.style === 'basket';
       const top = basket
-        ? L.h * MM_TO_M - HH.beamH + HH.sheet + thickness
+        ? L.h * MM_TO_M - S.beamH + S.sheet + thickness
         : L.h * MM_TO_M;
       let clear = 0.42; // top level: open above
       if (i < tiers - 1) {
         const N = hhLevels[i + 1];
         const nextBeamBottom =
-          N.h * MM_TO_M - HH.beamH - (N.style === 'basket' ? 0 : thickness);
+          N.h * MM_TO_M - S.beamH - (N.style === 'basket' ? 0 : thickness);
         clear = nextBeamBottom - top - 0.015;
       }
       // under a hanger bar the clothes need most of the height
@@ -1952,10 +2651,10 @@ function buildShelf(group, p, tpl) {
   const w = p.width * MM_TO_M,
     d = p.depth * MM_TO_M,
     h = p.height * MM_TO_M;
-  const perforated = tpl.brand === 'SPEEDRACK';
+  const perforated = tpl.brand === 'SPEEDRACK' && !isLevelProduct(tpl);
   const mats = makeMaterials(p, {
     perforated,
-    house: tpl.brand === 'HOMEDANT HOUSE',
+    house: isLevelProduct(tpl),
   });
   addPosts(group, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   const skipBottom = tpl.type === 'open_base';
@@ -2673,7 +3372,8 @@ function addHangingClothes(group, w, d, rodY, maxLen, seed) {
    the shelf, held by a round cup on the inside of each SIDE beam of the
    top level, low on the beam so the cup hangs just below its edge.     */
 function addHHHangerBar(group, w, d, frameMat, tiers, li = tiers - 1) {
-  const { postT: T, sheet: t, beamH: BH } = HH;
+  const SB = specOf(frameMat);
+  const { postT: T, sheet: t, beamH: BH } = SB.kind === 'lr' ? HH : SB;
   const hh = frameMat.userData.hh;
   const lv = hhResolveLevels(hh.product, tiers);
   const top = lv[li];
@@ -2712,10 +3412,52 @@ function addHHHangerBar(group, w, d, frameMat, tiers, li = tiers - 1) {
    is 104 mm from the floor to the underside of the post. Built around
    the swivel axis, with the wheel trailing behind it.                  */
 const HH_CASTER_H = 0.104;
-function addHHCaster(group, x, z, angle, brake) {
+// models up to 600 wide and 400 deep take 2-inch casters: 2.7" (69 mm)
+// instead of 4.1" (104 mm) from the floor to the post
+// (homedant.com: 62.2" vs 59.5" for 600x400)
+const HH_CASTER_H2 = 0.069;
+const hhSmallCaster = (p) => p.width <= 600 && p.depth <= 400;
+function hhCasterH(p) {
+  return p.caster2in ? HH_CASTER_H2 : HH_CASTER_H;
+}
+/* What you pick is the size name (900 x 400 x 1800). The real product
+   is a little bigger outside: homedant.com lists 36.2" x 16.5" x 71.3"
+   for that one, i.e. +20 mm on width and depth (+22 mm at 1200 wide) and
+   the post caps standing 11 mm above the frame. The 3D uses the real
+   outside, the name stays as picked.                                    */
+const HH_CAP_RISE = 11;
+function hhOuterMM(v) {
+  return v + (v >= 1200 ? 22 : 20);
+}
+const inch1 = (mm) => (mm / 25.4).toFixed(1);
+function hhOuterLabel(p) {
+  const o = hhOuterSize(p);
+  return {
+    mm: `${o.width} x ${o.depth} x ${o.height} mm`,
+    inch: `${inch1(o.width)} x ${inch1(o.depth)} x ${inch1(o.height)} in`,
+  };
+}
+function hhOuterSize(p) {
+  const rolling = ['hh_rolling', 'hh_trolley', 'hh_perf_trolley', 'sp_rolling', 'lr_rolling'].includes(p.productId);
+  const casterMM = rolling ? (hhSmallCaster(p) ? 69 : 104) : 0;
+  const S = specOfProduct(p);
+  if (S.kind === 'sp')
+    // homedant.com SS shelves: 12 mm wider and deeper, 11 mm taller
+    return { width: p.width + 12, depth: p.depth + 12, height: p.height + 11 + casterMM };
+  if (S.kind === 'lr')
+    // no published outside size yet: drawn to the size name
+    return { width: p.width, depth: p.depth, height: p.height + casterMM };
+  return {
+    width: hhOuterMM(p.width),
+    depth: hhOuterMM(p.depth),
+    height: p.height + HH_CAP_RISE + casterMM,
+  };
+}
+function addHHCaster(group, x, z, angle, brake, scale = 1) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
   g.rotation.y = angle;
+  g.scale.setScalar(scale);
   const black = new THREE.MeshStandardMaterial({
     color: 0x161616,
     metalness: 0.2,
@@ -2774,7 +3516,8 @@ function addHHCaster(group, x, z, angle, brake) {
   group.add(g);
 }
 
-function addHHCasters(group, inner, w, d) {
+function addHHCasters(group, inner, w, d, casterH = HH_CASTER_H) {
+  const scale = casterH / HH_CASTER_H;
   const { postT: T } = HH;
   const zinc = new THREE.MeshStandardMaterial({
     color: 0xc9cdd2,
@@ -2796,9 +3539,12 @@ function addHHCasters(group, inner, w, d) {
     hhAdd(inner, plateX, zinc, ex - sx * (T + 0.019), 0.035, ez - sz * (T + 0.001));
     hhAdd(inner, plateZ, zinc, ex - sx * (T + 0.001), 0.035, ez - sz * (T + 0.019));
     hhAdd(inner, base, zinc, ex - sx * 0.022, 0.0015, ez - sz * 0.022);
-    // caster under the bracket; the front pair carries the brakes
-    const angle = (sx > 0 ? Math.PI : 0) + sz * 0.4;
-    addHHCaster(group, ex - sx * 0.022, ez - sz * 0.022, angle, sz > 0);
+    // caster under the bracket; the left pair (as you face it) carries
+    // the brakes, the right pair turns freely
+    // wheels trail in under the frame, so the casters stay inside the
+    // shelf's footprint (homedant.com gives the same W x D for both)
+    const angle = sx > 0 ? -sz * 0.4 : Math.PI + sz * 0.4;
+    addHHCaster(group, ex - sx * 0.022, ez - sz * 0.022, angle, sx < 0, scale);
   });
 }
 
@@ -2813,7 +3559,7 @@ function buildGarmentRack(group, p, tpl) {
   const perforated = tpl.brand === 'SPEEDRACK';
   const mats = makeMaterials(p, {
     perforated,
-    house: tpl.brand === 'HOMEDANT HOUSE',
+    house: isLevelProduct(tpl),
   });
   addPosts(group, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   const gTiers = p.tier || tpl.defaultTier;
@@ -2854,20 +3600,20 @@ function buildRolling(group, p, tpl) {
   const perforated = tpl.brand === 'SPEEDRACK';
   const mats = makeMaterials(p, {
     perforated,
-    house: tpl.brand === 'HOMEDANT HOUSE',
+    house: isLevelProduct(tpl),
   });
   const isHH = !!mats.frame.userData.hh;
   const wheelR = 0.04;
   // the frame is lifted by the height of the wheels
   const inner = new THREE.Group();
-  inner.position.y = isHH ? HH_CASTER_H : wheelR * 2;
+  inner.position.y = isHH ? hhCasterH(p) : wheelR * 2;
   addPosts(inner, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   addTierBoards(inner, w, d, h, p.tier || tpl.defaultTier, mats.board, {
     frameMat: mats.frame,
   });
   group.add(inner);
   if (isHH) {
-    addHHCasters(group, inner, w, d);
+    addHHCasters(group, inner, w, d, hhCasterH(p));
     return;
   }
   // wheels
@@ -2981,17 +3727,21 @@ function makePegboardTexture(isBlack) {
 /* Perforated beam: a tall plate (180 mm) with five rows of round holes at
    a 25 mm pitch, used in place of an ordinary beam.                    */
 const HH_PERF_H = 0.18;
-function hhPerfMaterial(len, height, hex) {
+function hhPerfMaterial(len, height, hex, hanging = false) {
   const cols = Math.floor((len - 0.09) / 0.025) + 1;
-  const tex = labelTexture(`perf${Math.round(len * 1000)}x${Math.round(height * 1000)}`, Math.min(2048, Math.round(len * 2400)), Math.round(height * 2400), (x, cw, ch) => {
+  // holes from 27 mm below the top edge down to the beam's plain band
+  const rows = Math.max(1, Math.floor((height - 0.077) / 0.025) + 1);
+  const tex = labelTexture(`perf${Math.round(len * 1000)}x${Math.round(height * 1000)}${hanging ? 'h' : ''}`, Math.min(2048, Math.round(len * 2400)), Math.min(2048, Math.round(height * 2400)), (x, cw, ch) => {
     x.fillStyle = '#ffffff';
     x.fillRect(0, 0, cw, ch);
     x.globalCompositeOperation = 'destination-out';
-    const px = cw / len;
-    for (let r = 0; r < 5; r++)
+    const px = cw / len,
+      py = ch / height;
+    for (let r = 0; r < rows; r++)
       for (let c = 0; c < cols; c++) {
         x.beginPath();
-        x.arc(cw / 2 + (c - (cols - 1) / 2) * 0.025 * px, (0.027 + r * 0.025) * (ch / height), 0.0032 * px, 0, Math.PI * 2);
+        const y = (0.027 + r * 0.025) * py;
+        x.ellipse(cw / 2 + (c - (cols - 1) / 2) * 0.025 * px, hanging ? ch - y : y, 0.0032 * px, 0.0032 * py, 0, 0, Math.PI * 2);
         x.fill();
       }
   });
@@ -3016,38 +3766,26 @@ function buildHHTrolley(group, p, tpl) {
   const { flange: F, postT: T, sheet: t, beamH: BH } = HH;
   const mats = makeMaterials(p, { house: true });
   const tiers = p.tier || tpl.defaultTier;
+  // perforated beams (perforated trolley only): back and both ends of
+  // the level under the top, rising from it
+  const lv = hhResolveLevels(p, tiers);
+  if (tpl.perforated && tiers >= 2) {
+    const L = lv[tiers - 2],
+      N = lv[tiers - 1];
+    const beamBottom = L.h * MM_TO_M - (L.style === 'basket' ? 0 : 0.009) - BH;
+    const room = N.h * MM_TO_M - BH - 0.009 - 0.02 - beamBottom;
+    const ph = Math.min(HH_PERF_H, room);
+    if (ph >= 0.16) {
+      mats.frame.userData.hh.perf = { [tiers - 2]: ph };
+      mats.frame.userData.hh.perfUp = true;
+    }
+  }
   const inner = new THREE.Group();
-  inner.position.y = HH_CASTER_H;
+  inner.position.y = hhCasterH(p);
   addPosts(inner, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   addTierBoards(inner, w, d, h, tiers, mats.board, { frameMat: mats.frame });
   group.add(inner);
-  addHHCasters(group, inner, w, d);
-
-  // perforated beams: back and both ends of the level under the top
-  const lv = hhResolveLevels(p, tiers);
-  if (tiers >= 2) {
-    const L = lv[tiers - 2];
-    const beamTop = L.h * MM_TO_M - (L.style === 'basket' ? 0 : 0.009);
-    const y0 = beamTop - BH;
-    const N = lv[tiers - 1];
-    const room = N.h * MM_TO_M - BH - 0.009 - 0.02 - y0;
-    const ph = Math.min(HH_PERF_H, room);
-    if (ph >= 0.16) {
-      const lenX = w - 2 * T,
-        lenZ = d - 2 * T - 2 * t;
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(lenX, ph), hhPerfMaterial(lenX, ph, mats.frameHex));
-      back.position.set(0, y0 + ph / 2, -(d / 2 - T + 0.0004));
-      back.castShadow = true;
-      inner.add(back);
-      [-1, 1].forEach((sx) => {
-        const end = new THREE.Mesh(new THREE.PlaneGeometry(lenZ, ph), hhPerfMaterial(lenZ, ph, mats.frameHex));
-        end.rotation.y = Math.PI / 2;
-        end.position.set(sx * (w / 2 - T + 0.0004), y0 + ph / 2, 0);
-        end.castShadow = true;
-        inner.add(end);
-      });
-    }
-  }
+  addHHCasters(group, inner, w, d, hhCasterH(p));
 
   // push handle: a moulded bracket over each post top at one end, and a
   // tube between them
@@ -3068,15 +3806,74 @@ function buildHHTrolley(group, p, tpl) {
   hhAdd(
     inner,
     tube,
-    new THREE.MeshStandardMaterial({ color: 0xe8ebee, metalness: 0.15, roughness: 0.25, emissive: 0x2e2e2e }),
+    plastic, // the tube follows the frame colour too: white or black
     w / 2 + 0.046,
     h + 0.017,
     0
   );
 }
 
+/* Perforated steel sheet, 25 mm hole pitch, as a repeating tile so any
+   panel size can use it. tile = 4 x 4 holes = 100 mm square.           */
+function hhPegPanelMaterial(w, h, hex) {
+  const tex = labelTexture('pegtile', 256, 256, (x, cw, ch) => {
+    x.fillStyle = '#ffffff';
+    x.fillRect(0, 0, cw, ch);
+    x.globalCompositeOperation = 'destination-out';
+    for (let r = 0; r < 4; r++)
+      for (let c = 0; c < 4; c++) {
+        x.beginPath();
+        x.arc((c + 0.5) * 64, (r + 0.5) * 64, 9, 0, Math.PI * 2);
+        x.fill();
+      }
+  }).clone();
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(w / 0.1, h / 0.1);
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return new THREE.MeshStandardMaterial({
+    color: hex,
+    map: tex,
+    alphaTest: 0.5,
+    side: THREE.DoubleSide,
+    roughness: 0.6,
+    metalness: 0,
+  });
+}
+/* HOMEDANT HOUSE pegboard shelf: an ordinary shelf whose back and end
+   beams are perforated beams. Like the perforated trolley's (CAD: 180 mm
+   plate covering 170 of the 253 mm between two levels), each one covers
+   about two thirds of the bay, but here it hangs from the level above,
+   so the top of each bay is closed and the bottom is open.            */
+const HH_PERF_RATIO = 170 / 253;
+function hhPerfDrops(p, tiers) {
+  const { beamH: BH, sheet: t } = HH;
+  const lv = hhResolveLevels(p, tiers);
+  const out = {};
+  for (let i = 1; i < tiers; i++) {
+    const L = lv[i - 1],
+      N = lv[i];
+    const boardTop = L.style === 'basket' ? L.h * MM_TO_M - BH + t + 0.009 : L.h * MM_TO_M;
+    const beamTop = N.h * MM_TO_M - (N.style === 'basket' ? 0 : 0.009);
+    const clear = beamTop - BH - boardTop;
+    out[i] = BH + clear * HH_PERF_RATIO;
+  }
+  return out;
+}
+function buildHHPegShelf(group, p, tpl) {
+  const w = p.width * MM_TO_M,
+    d = p.depth * MM_TO_M,
+    h = p.height * MM_TO_M;
+  const mats = makeMaterials(p, { house: true });
+  const tiers = p.tier || tpl.defaultTier;
+  mats.frame.userData.hh.perf = hhPerfDrops(p, tiers);
+  addPosts(group, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
+  addTierBoards(group, w, d, h, tiers, mats.board, { frameMat: mats.frame });
+  addPostFeet(group, w, d, mats.foot, 0.025);
+}
+
 function buildPegboard(group, p, tpl) {
-  if (tpl.brand === 'HOMEDANT HOUSE') return buildHHTrolley(group, p, tpl);
+  if (tpl.brand === 'HOMEDANT HOUSE') return buildHHPegShelf(group, p, tpl);
   const w = p.width * MM_TO_M,
     d = p.depth * MM_TO_M,
     h = p.height * MM_TO_M;
@@ -3690,6 +4487,241 @@ function buildCatalogStand(group, p) {
   }
 }
 
+/* A cartoon booth staff member: big head, simple face, a lanyard name
+   tag. Not a likeness of anyone; the name tag, glasses, shirt and hair
+   are set in the side panel so the figure can be dressed up for fun.  */
+const STAFF_SHIRTS = { navy: 0x26324a, black: 0x1d1e21, white: 0xe9e9e6, grey: 0x7d8086, blue: 0x5b83b8 };
+function buildStaff(group, p, tpl) {
+  // fixed look: brown hair parted just off centre with the fringe swept
+  // to both sides, round black glasses, and a dark suit with white shirt
+  // and tie
+  const coat = tpl && tpl.preset === 'coat';
+  if (coat) p = { ...p, staffGlasses: true, staffName: p.staffName ?? '이과장' };
+  const H = p.height * MM_TO_M;
+  const k = H / 1.75;
+  const g = new THREE.Group();
+  g.scale.setScalar(k);
+  group.add(g);
+  const mat = (c, r = 0.85) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: 0 });
+  const add = (parent, geo, m, x, y, z) => {
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  };
+  const skin = mat(0xd9ad8c, 0.7);
+  const shirt = coat ? mat(0x2a2f3a, 0.8) : mat(STAFF_SHIRTS[p.staffShirt] || STAFF_SHIRTS.navy, 0.9);
+  const pants = coat ? shirt : mat(0x2b2e35, 0.9);
+  const shoe = mat(0x161616, 0.5);
+  const hair = mat(coat ? 0x4a3325 : 0x1b1714, 0.8);
+  const white = mat(0xeeeeec, 0.8);
+  const tie = mat(0x3a2a4a, 0.6);
+  if (coat) shirt.side = THREE.DoubleSide;
+  const dark = mat(0x111111, 0.4);
+
+  // legs and shoes
+  [-0.09, 0.09].forEach((x) => {
+    add(g, new THREE.CylinderGeometry(0.068, 0.058, 0.78, 14), pants, x, 0.43, 0);
+    const sh = add(g, new THREE.BoxGeometry(0.1, 0.06, 0.2), shoe, x, 0.03, 0.03);
+    sh.geometry.translate(0, 0, 0);
+  });
+  // body
+  if (coat) {
+    // white shirt and tie, seen in the V of the jacket
+    const inner = add(g, new THREE.CylinderGeometry(0.19, 0.165, 0.58, 20), white, 0, 1.07, 0);
+    inner.scale.z = 0.6;
+    add(g, new THREE.CylinderGeometry(0.06, 0.07, 0.07, 14), skin, 0, 1.385, 0); // neck
+    [-1, 1].forEach((s) => {
+      const c = add(g, new THREE.BoxGeometry(0.08, 0.05, 0.012), white, s * 0.04, 1.34, 0.108);
+      c.rotation.z = s * 0.6;
+    });
+    add(g, new THREE.BoxGeometry(0.035, 0.03, 0.02), tie, 0, 1.325, 0.112); // knot
+    const blade = add(g, new THREE.CylinderGeometry(0.024, 0.036, 0.3, 4), tie, 0, 1.16, 0.114);
+    blade.rotation.y = Math.PI / 4;
+    blade.scale.z = 0.25;
+    // jacket: buttoned, open in a V at the chest, down to the hip
+    const gap = 0.3;
+    const shell = add(g, new THREE.CylinderGeometry(0.212, 0.2, 0.6, 28, 1, true, gap, Math.PI * 2 - 2 * gap), shirt, 0, 1.08, 0);
+    shell.scale.z = 0.64;
+    const lower = add(g, new THREE.CylinderGeometry(0.2, 0.205, 0.2, 28), shirt, 0, 0.87, 0); // closed below the button
+    lower.scale.z = 0.64;
+    add(g, new THREE.CylinderGeometry(0.1, 0.212, 0.04, 28), shirt, 0, 1.39, 0).scale.z = 0.64; // shoulders
+    [-1, 1].forEach((s) => {
+      const lap = add(g, new THREE.BoxGeometry(0.06, 0.3, 0.012), shirt, s * 0.07, 1.2, 0.128);
+      lap.rotation.set(-0.1, s * 0.3, s * 0.28);
+    });
+    add(g, new THREE.SphereGeometry(0.011, 10, 8), mat(0x111111, 0.4), 0, 0.99, 0.133); // button
+  } else {
+    const torso = add(g, new THREE.CylinderGeometry(0.2, 0.17, 0.56, 20), shirt, 0, 1.08, 0);
+    torso.scale.z = 0.62;
+    add(g, new THREE.CylinderGeometry(0.06, 0.07, 0.07, 14), skin, 0, 1.38, 0); // neck
+    // collar
+    [-1, 1].forEach((s) => {
+      const c = add(g, new THREE.BoxGeometry(0.09, 0.05, 0.012), shirt, s * 0.045, 1.335, 0.105);
+      c.rotation.z = s * 0.55;
+    });
+  }
+  // arms: left down, right raised in a wave
+  const armGeo = new THREE.CylinderGeometry(0.048, 0.04, 0.56, 12);
+  armGeo.translate(0, -0.28, 0);
+  const handGeo = new THREE.SphereGeometry(0.05, 12, 10);
+  const armL = add(g, armGeo, shirt, -0.235, 1.33, 0);
+  armL.rotation.z = -0.12;
+  add(armL, handGeo, skin, 0, -0.6, 0);
+  const armR = add(g, armGeo, shirt, 0.235, 1.33, 0);
+  armR.rotation.z = 2.55;
+  add(armR, handGeo, skin, 0, -0.6, 0);
+
+  // head: larger than life, for a cartoon look
+  const head = new THREE.Group();
+  head.position.set(0, 1.6, 0);
+  g.add(head);
+  const R = 0.165;
+  const face = add(head, new THREE.SphereGeometry(R, 32, 24), skin, 0, 0, 0);
+  face.scale.set(1, 1.08, 0.98);
+  [-1, 1].forEach((s) => add(head, new THREE.SphereGeometry(0.035, 12, 10), skin, s * R * 0.98, -0.01, 0));
+  // hair cap
+  const cap = add(head, new THREE.SphereGeometry(R * 1.07, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.48), hair, 0, 0.012, -0.012);
+  cap.rotation.x = -0.32;
+  cap.scale.set(1, 1.05, 1);
+  if (coat) {
+    cap.visible = false;
+    // Side parting (가르마): a line on top of the head a little to the left
+    // as you face him. From that line the hair is combed two ways: a big
+    // sweep falls diagonally across the forehead to the right temple, and
+    // a shorter side falls to the left, so the forehead shows as a
+    // triangle under the parting.
+    const full = R * 1.12;
+    const SC = [1.04, 1.1, 1.04],
+      OFF = [0, 0.008, -0.006];
+    hair.side = THREE.DoubleSide;
+    const onHead = (r, ph, th) => [
+      -r * Math.cos(ph) * Math.sin(th) * SC[0] + OFF[0],
+      r * Math.cos(th) * SC[1] + OFF[1],
+      r * Math.sin(ph) * Math.sin(th) * SC[2] + OFF[2],
+    ];
+    // a patch of the hair shell between two angles round the head, each
+    // column running from the crown down to where that column ends
+    const patch = (r, ph0, ph1, end, nPh = 48, nTh = 14) => {
+      const pos = [],
+        nor = [],
+        idx = [];
+      for (let i = 0; i <= nPh; i++) {
+        const ph = ph0 + ((ph1 - ph0) * i) / nPh;
+        const te = end(ph);
+        for (let j = 0; j <= nTh; j++) {
+          const th = (te * j) / nTh;
+          const v = onHead(r, ph, th);
+          pos.push(...v);
+          const n = new THREE.Vector3(-Math.cos(ph) * Math.sin(th), Math.cos(th), Math.sin(ph) * Math.sin(th));
+          nor.push(n.x, n.y, n.z);
+        }
+      }
+      for (let i = 0; i < nPh; i++)
+        for (let j = 0; j < nTh; j++) {
+          const a0 = i * (nTh + 1) + j,
+            b0 = a0 + nTh + 1;
+          idx.push(a0, b0, a0 + 1, b0, b0 + 1, a0 + 1);
+        }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+      geo.setIndex(idx);
+      return add(head, geo, hair, 0, 0, 0);
+    };
+    const partPhi = Math.PI / 2 - 0.24; // left of centre as you face him
+    const top = Math.PI * 0.1; // the hairline at the parting
+    // big side: drops fast from the parting, then runs along the brow
+    patch(full * 1.01, partPhi, partPhi + 1.5, (ph) => {
+      const u = Math.min(1, (ph - partPhi) / 0.85);
+      return top + Math.PI * (0.31 * (1 - (1 - u) * (1 - u)) + (ph - partPhi > 1.1 ? 0.06 : 0));
+    });
+    // short side: a gentler slope down to the left temple
+    patch(full * 1.01, partPhi - 1.45, partPhi, (ph) => {
+      const u = Math.min(1, (partPhi - ph) / 0.6);
+      return top + Math.PI * (0.3 * (1 - (1 - u) * (1 - u)) + (partPhi - ph > 1.15 ? 0.06 : 0));
+    });
+    // back and sides, down past the ears
+    patch(full, partPhi + 1.4, partPhi - 1.35 + Math.PI * 2, () => Math.PI * 0.6, 40, 16);
+    // the parting line itself, from the hairline back over the crown
+    const seam = [];
+    for (let k = 0; k <= 8; k++) seam.push(new THREE.Vector3(...onHead(full * 1.025, partPhi, top * (1 - k / 8) + 0.02)));
+    add(head, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(seam), 16, 0.0028, 6), mat(0x24170f, 0.9), 0, 0, 0);
+    // volume where the big side lifts off the parting and rolls over
+    const roll = add(head, new THREE.SphereGeometry(R * 0.42, 18, 12), hair, 0.05, R * 0.86, R * 0.42);
+    roll.scale.set(1.35, 0.42, 0.85);
+    roll.rotation.set(0.35, 0, -0.42);
+  } else if (p.staffHair === 'parted') {
+    const sweep = add(head, new THREE.SphereGeometry(R * 0.62, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), hair, -0.05, R * 0.72, R * 0.42);
+    sweep.rotation.set(0.55, 0, 0.35);
+    sweep.scale.set(1.25, 0.45, 0.8);
+  } else {
+    const fringe = add(head, new THREE.BoxGeometry(R * 1.5, 0.035, 0.05), hair, 0, R * 0.62, R * 0.7);
+    fringe.rotation.x = 0.5;
+  }
+  // eyes, brows, nose, smile
+  const zf = R * 0.93;
+  [-1, 1].forEach((s) => {
+    add(head, new THREE.SphereGeometry(0.017, 12, 10), dark, s * 0.055, 0.02, zf);
+    const brow = add(head, new THREE.BoxGeometry(0.05, 0.011, 0.01), hair, s * 0.057, 0.068, zf - 0.006);
+    brow.rotation.z = -s * 0.1;
+  });
+  add(head, new THREE.SphereGeometry(0.018, 10, 8), skin, 0, -0.018, R * 1.0);
+  const smile = add(head, new THREE.TorusGeometry(0.04, 0.0065, 8, 20, Math.PI * 0.8), mat(0x7a3b33, 0.6), 0, -0.045, zf - 0.008);
+  smile.rotation.z = Math.PI + Math.PI * 0.1;
+  if (p.staffGlasses) {
+    const frame = mat(0x151515, 0.35);
+    [-1, 1].forEach((s) => {
+      add(head, new THREE.TorusGeometry(coat ? 0.04 : 0.036, coat ? 0.0075 : 0.0055, 10, 28), frame, s * 0.058, 0.02, zf + 0.018);
+      // temple: from the outer edge of the lens back into the hair
+      add(head, new THREE.BoxGeometry(0.006, 0.006, 0.07), frame, s * (coat ? 0.1 : 0.094), 0.022, zf - 0.01);
+    });
+    add(head, new THREE.BoxGeometry(0.04, 0.005, 0.005), frame, 0, 0.026, zf + 0.02);
+  }
+
+  // lanyard and name tag
+  const strap = mat(0x2f5fa8, 0.7);
+  if (!coat) [-1, 1].forEach((s) => {
+    const st = add(g, new THREE.BoxGeometry(0.014, 0.24, 0.004), strap, s * 0.05, 1.24, 0.118);
+    st.rotation.z = -s * 0.32;
+  });
+  const name = (p.staffName || '').trim() || tr('Staff');
+  const c = document.createElement('canvas');
+  c.width = 320;
+  c.height = 200;
+  const x = c.getContext('2d');
+  x.fillStyle = '#ffffff';
+  x.fillRect(0, 0, 320, 200);
+  x.fillStyle = '#2f5fa8';
+  x.fillRect(0, 0, 320, 46);
+  x.fillStyle = '#ffffff';
+  x.font = 'bold 30px Arial, sans-serif';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.fillText('HOMEDANT', 160, 24);
+  x.fillStyle = '#111111';
+  x.font = `bold ${name.length > 6 ? 46 : 64}px "Noto Sans KR", "Malgun Gothic", Arial, sans-serif`;
+  x.fillText(name, 160, 124, 296);
+  // speech bubble above the head
+  const say = p.staffSay === undefined ? 'Hi, how are you?' : p.staffSay.trim();
+  if (say) {
+    const b = makeSpeechBubble(say, 0.9);
+    b.position.set(0, 1.98, 0);
+    g.add(b);
+  }
+  const tagTex = new THREE.CanvasTexture(c);
+  tagTex.anisotropy = 4;
+  const tag = coat
+    ? add(g, new THREE.BoxGeometry(0.11, 0.07, 0.004), mat(0xffffff), -0.135, 1.2, 0.128)
+    : add(g, new THREE.BoxGeometry(0.11, 0.07, 0.004), mat(0xffffff), 0, 1.1, 0.123);
+  if (coat) tag.rotation.y = -0.45;
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(0.108, 0.068), new THREE.MeshBasicMaterial({ map: tagTex }));
+  front.position.set(0, 0, 0.0025);
+  tag.add(front);
+}
+
 function buildTVStand(group, p) {
   const w = p.width * MM_TO_M,
     h = p.height * MM_TO_M,
@@ -3723,6 +4755,11 @@ function buildTVStand(group, p) {
 
 function buildProductMesh(p, tpl) {
   const group = new THREE.Group();
+  // HOMEDANT HOUSE: draw the real outside width and depth (see hhOuterSize)
+  if (isLevelProduct(tpl)) {
+    const o = hhOuterSize(p);
+    p = { ...p, width: o.width, depth: o.depth, caster2in: hhSmallCaster(p) };
+  }
   switch (tpl.type) {
     case 'shelf':
       buildShelf(group, p, tpl);
@@ -3744,6 +4781,9 @@ function buildProductMesh(p, tpl) {
       break;
     case 'pegboard':
       buildPegboard(group, p, tpl);
+      break;
+    case 'trolley':
+      buildHHTrolley(group, p, tpl);
       break;
     case 'drawer':
       buildDrawer(group, p, tpl);
@@ -3772,6 +4812,9 @@ function buildProductMesh(p, tpl) {
     case 'tv':
       buildTVStand(group, p);
       break;
+    case 'staff':
+      buildStaff(group, p, tpl);
+      break;
     default:
       buildShelf(group, p, tpl);
   }
@@ -3781,9 +4824,942 @@ function buildProductMesh(p, tpl) {
 /* ============================================================
    MAIN COMPONENT
    ============================================================ */
-export default function BoothSimulator() {
+/* ============================================================
+   SHARED LIBRARY (Supabase)
+   Booth layouts and buyer proposals live in a shared database so the
+   whole team sees the same folders from any computer. The tables are
+   closed to the public key; every call goes through a database
+   function that first checks the team code.
+   ============================================================ */
+const CLOUD_URL = 'https://uqtmalzkgzkyjmkkrqqz.supabase.co';
+const CLOUD_KEY = 'sb_publishable_eFPznN5HbJ3EUxKraeeoIw_Rq3NarF_';
+const TEAM_CODE_KEY = 'hbs-team-code';
+function loadTeamCode() {
+  try {
+    return window.localStorage.getItem(TEAM_CODE_KEY) || '';
+  } catch (e) {
+    return '';
+  }
+}
+function storeTeamCode(code) {
+  try {
+    if (code) window.localStorage.setItem(TEAM_CODE_KEY, code);
+    else window.localStorage.removeItem(TEAM_CODE_KEY);
+  } catch (e) {
+    /* storage unavailable: the code lasts for this visit */
+  }
+}
+async function cloud(fn, args) {
+  const r = await fetch(`${CLOUD_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: CLOUD_KEY },
+    body: JSON.stringify(args),
+  });
+  const text = await r.text();
+  if (!r.ok) {
+    let msg = text;
+    try {
+      msg = JSON.parse(text).message || text;
+    } catch (e) {
+      /* not JSON */
+    }
+    const err = new Error(msg);
+    err.badCode = /invalid team code/.test(msg);
+    throw err;
+  }
+  return text ? JSON.parse(text) : null;
+}
+
+/* Folders and saved items for one kind ('booth' or 'buyer').
+   getCurrent() returns { name, data, thumbnail } for "save";
+   onOpen(item) receives a saved item with its data.               */
+/* The shared list of folders and saved items for one app ('buyer' or
+   'booth'), with the team code. Used by the buyer sidebar.            */
+function useCloudList(kind, enabled) {
+  const [code, setCode] = useState(loadTeamCode);
+  const [authed, setAuthed] = useState(false);
+  const [folders, setFolders] = useState([]);
+  const [items, setItems] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const fail = (e) => {
+    if (e.badCode) {
+      storeTeamCode('');
+      setCode('');
+      setAuthed(false);
+      setError(tr('The team code is not correct.'));
+    } else setError(tr('Could not reach the shared library.') + ' ' + e.message);
+  };
+  const refresh = async (c = code) => {
+    if (!c) return;
+    setBusy(true);
+    setError('');
+    try {
+      const r = await cloud('booth_list', { p_code: c, p_kind: kind });
+      setFolders(r.folders || []);
+      setItems(r.items || []);
+      setAuthed(true);
+      if (c !== code) setCode(c);
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+  useEffect(() => {
+    if (enabled && code) refresh(code);
+  }, []);
+  const login = async (raw) => {
+    const c = (raw || '').trim();
+    if (!c) return;
+    setBusy(true);
+    setError('');
+    try {
+      const ok = await cloud('booth_check', { p_code: c });
+      if (!ok) {
+        setError(tr('The team code is not correct.'));
+        setBusy(false);
+        return;
+      }
+      storeTeamCode(c);
+      setCode(c);
+      await refresh(c);
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+    }
+  };
+  const run = async (fn, args) => {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await cloud(fn, { p_code: code, ...args });
+      await refresh();
+      return r;
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+      return null;
+    }
+  };
+  const get = async (id) => {
+    try {
+      return await cloud('booth_get_item', { p_code: code, p_id: id });
+    } catch (e) {
+      fail(e);
+      return null;
+    }
+  };
+  return { kind, code, authed, folders, items, busy, error, refresh, login, run, get };
+}
+
+/* Buyer app, left side: buyers (folders) with their proposals on top,
+   the products underneath. A product clicked here starts a new
+   proposal for the buyer that is open.                                */
+function BuyerSidebar({ lib, folderId, setFolderId, cloudId, onOpenItem, onNewProposal, onPickProduct, productId, onManage }) {
+  const [open, setOpen] = useState({}); // expanded folders
+  const [editing, setEditing] = useState(null); // { type: 'newFolder' | 'folder' | 'item', id }
+  const [ask, setAsk] = useState(null); // { text, onYes }
+  const [codeInput, setCodeInput] = useState('');
+  const { folders, items } = lib;
+  const childrenOf = (pid) => folders.filter((f) => (f.parent_id || null) === pid);
+  const itemsIn = (fid) => items.filter((it) => (it.folder_id || null) === fid);
+  const countIn = (fid) => itemsIn(fid).length + childrenOf(fid).reduce((n, f) => n + countIn(f.id), 0);
+  const isOpen = (fid) => open[fid] !== undefined ? open[fid] : fid === folderId;
+  // keep the folder of the open proposal expanded
+  useEffect(() => {
+    if (folderId) setOpen((o) => ({ ...o, [folderId]: true }));
+  }, [folderId]);
+
+  const iconBtn = 'p-1 rounded text-gray-400 hover:text-gray-800 hover:bg-gray-100';
+  const itemRow = (it) =>
+    editing && editing.type === 'item' && editing.id === it.id ? (
+      <div key={it.id} className="py-0.5">
+        <InlineName
+          initial={it.name}
+          onCommit={async (n) => {
+            setEditing(null);
+            await lib.run('booth_save_item', { p_item: { id: it.id, name: n } });
+          }}
+          onCancel={() => setEditing(null)}
+          className="w-full"
+        />
+      </div>
+    ) : (
+      <div
+        key={it.id}
+        onClick={() => onOpenItem(it)}
+        className={
+          'group flex items-center gap-2 px-1.5 py-1 mb-0.5 rounded-md cursor-pointer ' +
+          (it.id === cloudId ? 'bg-gray-900 text-white' : 'hover:bg-white')
+        }
+      >
+        <span className="flex-none w-9 h-7 rounded overflow-hidden bg-gray-200">
+          {it.thumbnail && <img src={it.thumbnail} alt="" className="w-full h-full object-cover" />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs truncate">{it.name}</span>
+          <span className={'block text-[10px] ' + (it.id === cloudId ? 'text-gray-300' : 'text-gray-400')}>
+            {new Date(it.updated_at).toLocaleDateString()}
+          </span>
+        </span>
+        <span className="hidden group-hover:flex items-center">
+          <button
+            title={tr('Rename')}
+            className={iconBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditing({ type: 'item', id: it.id });
+            }}
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+          <button
+            title={tr('Delete')}
+            className={iconBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              setAsk({
+                text: `“${it.name}” ` + tr('will be deleted for everyone on the team.'),
+                onYes: async () => {
+                  await lib.run('booth_delete_item', { p_id: it.id });
+                  if (it.id === cloudId) onNewProposal(folderId);
+                },
+              });
+            }}
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </span>
+      </div>
+    );
+
+  const folderBlock = (f, depth) => {
+    const expanded = isOpen(f.id);
+    const active = f.id === folderId;
+    return (
+      <div key={f.id}>
+        {editing && editing.type === 'folder' && editing.id === f.id ? (
+          <div className="py-0.5" style={{ paddingLeft: depth * 12 }}>
+            <InlineName
+              initial={f.name}
+              onCommit={async (n) => {
+                setEditing(null);
+                await lib.run('booth_save_folder', { p_folder: { id: f.id, name: n } });
+              }}
+              onCancel={() => setEditing(null)}
+              className="w-full"
+            />
+          </div>
+        ) : (
+          <div
+            onClick={() => {
+              setOpen((o) => ({ ...o, [f.id]: !expanded }));
+              setFolderId(f.id);
+            }}
+            className={'group flex items-center gap-1.5 px-1.5 py-1.5 rounded-md cursor-pointer text-xs ' + (active ? 'bg-white font-medium' : 'hover:bg-white text-gray-700')}
+            style={{ paddingLeft: 6 + depth * 12 }}
+          >
+            {expanded ? <ChevronDown className="w-3 h-3 text-gray-400 flex-none" /> : <ChevronRight className="w-3 h-3 text-gray-400 flex-none" />}
+            <FolderOpen className="w-3.5 h-3.5 flex-none text-gray-500" />
+            <span className="flex-1 truncate">{f.name}</span>
+            <span className="group-hover:hidden text-[11px] text-gray-400">{countIn(f.id)}</span>
+            <span className="hidden group-hover:flex items-center">
+              <button
+                title={tr('Rename')}
+                className={iconBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditing({ type: 'folder', id: f.id });
+                }}
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+              <button
+                title={tr('Delete')}
+                className={iconBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAsk({
+                    text: `“${f.name}” ` + tr('Delete this folder? What is inside moves up one level.'),
+                    onYes: async () => {
+                      await lib.run('booth_delete_folder', { p_id: f.id });
+                      if (active) setFolderId(f.parent_id || null);
+                    },
+                  });
+                }}
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </span>
+          </div>
+        )}
+        {expanded && (
+          <div className="ml-3 pl-2 border-l mb-1" style={{ borderColor: UI_LINE, marginLeft: 12 + depth * 12 }}>
+            {childrenOf(f.id).map((c) => folderBlock(c, 0))}
+            {itemsIn(f.id).map(itemRow)}
+            <button
+              onClick={() => onNewProposal(f.id)}
+              className="w-full text-left text-[11px] text-gray-600 px-2 py-1 mt-0.5 rounded-md border border-dashed border-gray-300 hover:bg-white"
+            >
+              + {tr('New proposal for this buyer')}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const loose = itemsIn(null);
+  const folderName = folderId ? (folders.find((f) => f.id === folderId) || {}).name : null;
+  return (
+    <div className="p-3 relative">
+      <div className="flex items-center justify-between mb-1.5 px-0.5">
+        <span className="text-[11px] font-semibold tracking-wide text-gray-500">{tr('Buyers')}</span>
+        <span className="flex items-center gap-1">
+          {lib.busy && <span className="text-[10px] text-gray-400">{tr('Working…')}</span>}
+          {lib.authed && (
+            <button title={tr('Manage folders')} onClick={onManage} className={iconBtn}>
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </span>
+      </div>
+
+      {!lib.authed ? (
+        <div className="rounded-lg border bg-white p-3 mb-3" style={{ borderColor: UI_LINE }}>
+          <div className="text-xs text-gray-700 mb-2">{tr('Enter the team code')}</div>
+          <div className="flex gap-1.5">
+            <input
+              type="password"
+              value={codeInput}
+              onChange={(e) => setCodeInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && lib.login(codeInput)}
+              className="flex-1 min-w-0 text-xs border border-gray-300 rounded px-2 py-1"
+            />
+            <button onClick={() => lib.login(codeInput)} className="text-xs px-2.5 py-1 rounded bg-gray-900 text-white">
+              {tr('Open')}
+            </button>
+          </div>
+          {lib.error && <div className="text-[11px] text-red-600 mt-1.5">{lib.error}</div>}
+        </div>
+      ) : (
+        <div className="mb-3">
+          {lib.error && <div className="text-[11px] text-red-600 mb-1.5">{lib.error}</div>}
+          {childrenOf(null).map((f) => folderBlock(f, 0))}
+          {loose.length > 0 && (
+            <div>
+              <div
+                onClick={() => setOpen((o) => ({ ...o, __none: !o.__none }))}
+                className="flex items-center gap-1.5 px-1.5 py-1.5 rounded-md cursor-pointer text-xs text-gray-500 hover:bg-white"
+              >
+                {open.__none ? <ChevronDown className="w-3 h-3 text-gray-400" /> : <ChevronRight className="w-3 h-3 text-gray-400" />}
+                <FolderOpen className="w-3.5 h-3.5 text-gray-400" />
+                <span className="flex-1">{tr('No folder')}</span>
+                <span className="text-[11px] text-gray-400">{loose.length}</span>
+              </div>
+              {open.__none && <div className="ml-3 pl-2 border-l mb-1" style={{ borderColor: UI_LINE }}>{loose.map(itemRow)}</div>}
+            </div>
+          )}
+          {editing && editing.type === 'newFolder' ? (
+            <div className="flex items-center gap-1.5 px-1.5 py-1">
+              <FolderOpen className="w-3.5 h-3.5 text-gray-500 flex-none" />
+              <InlineName
+                placeholder={tr('Buyer name')}
+                onCommit={async (n) => {
+                  setEditing(null);
+                  const r = await lib.run('booth_save_folder', { p_folder: { kind: lib.kind, name: n, parent_id: null } });
+                  if (r) onNewProposal(r.id);
+                }}
+                onCancel={() => setEditing(null)}
+                className="flex-1"
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setEditing({ type: 'newFolder' })}
+              className="w-full mt-1.5 text-xs text-gray-600 py-1.5 rounded-md border border-dashed border-gray-300 hover:bg-white"
+            >
+              + {tr('New buyer folder')}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-baseline justify-between mb-1.5 mt-4 px-0.5">
+        <span className="text-[11px] font-semibold tracking-wide text-gray-500">{tr('Products')}</span>
+        {folderName && cloudId && <span className="text-[10px] text-gray-400 truncate ml-2">{tr('Click to start a new proposal')}</span>}
+      </div>
+      {BUYER_TEMPLATES.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onPickProduct(t)}
+          className={
+            'w-full flex items-center gap-2.5 text-left px-2.5 py-1.5 mb-1 rounded-lg border transition ' +
+            (t.id === productId ? 'bg-white border-gray-900' : 'bg-white border-gray-200 hover:border-gray-400')
+          }
+        >
+          <ProductThumb type={t.type} tpl={t} />
+          <span className="min-w-0">
+            <span className="block text-xs font-medium text-gray-900 truncate">{tr(t.name)}</span>
+            <span className="block text-[11px] text-gray-500">
+              {t.defaultSize.width}×{t.defaultSize.depth}×{t.defaultSize.height}mm
+            </span>
+          </span>
+        </button>
+      ))}
+
+      {ask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.2)' }} onClick={() => setAsk(null)}>
+          <div className="bg-white rounded-lg shadow-xl border p-4 w-80" style={{ borderColor: UI_LINE }} onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm text-gray-800 mb-4 leading-relaxed">{ask.text}</div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setAsk(null)} className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:border-gray-400">
+                {tr('Cancel')}
+              </button>
+              <button
+                autoFocus
+                onClick={() => {
+                  const a = ask;
+                  setAsk(null);
+                  a.onYes();
+                }}
+                className="text-xs font-medium px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700"
+              >
+                {tr('Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* One-line name editor used inside the library instead of the browser's
+   prompt box. Enter saves, Esc cancels, clicking away saves. */
+function InlineName({ initial = '', placeholder, onCommit, onCancel, className = '' }) {
+  const [v, setV] = useState(initial);
+  const done = useRef(false);
+  const commit = () => {
+    if (done.current) return;
+    done.current = true;
+    const t = v.trim();
+    if (t && t !== initial) onCommit(t);
+    else onCancel();
+  };
+  return (
+    <input
+      autoFocus
+      value={v}
+      placeholder={placeholder}
+      onChange={(e) => setV(e.target.value)}
+      onFocus={(e) => e.target.select()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') {
+          done.current = true;
+          onCancel();
+        }
+      }}
+      onBlur={commit}
+      onClick={(e) => e.stopPropagation()}
+      className={'min-w-0 text-xs border border-gray-900 rounded px-2 py-1 bg-white outline-none ' + className}
+    />
+  );
+}
+
+function CloudLibrary({ kind, title, getCurrent, onOpen, currentId, setCurrentId, onClose, localImport }) {
+  const [code, setCode] = useState(loadTeamCode);
+  const [codeInput, setCodeInput] = useState('');
+  const [authed, setAuthed] = useState(false);
+  const [folders, setFolders] = useState([]);
+  const [items, setItems] = useState([]);
+  const [sel, setSel] = useState('all'); // 'all', 'none' or a folder id
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const cur = getCurrent();
+  const [saveName, setSaveName] = useState(cur.name);
+  // inline editing: { type: 'newFolder' | 'folder' | 'item', id }
+  const [editing, setEditing] = useState(null);
+  // in-app confirm box: { text, yes, onYes }
+  const [ask, setAsk] = useState(null);
+  const [notice, setNotice] = useState('');
+
+  const fail = (e) => {
+    if (e.badCode) {
+      storeTeamCode('');
+      setCode('');
+      setAuthed(false);
+      setError(tr('The team code is not correct.'));
+    } else setError(tr('Could not reach the shared library.') + ' ' + e.message);
+  };
+  const refresh = async (c = code) => {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await cloud('booth_list', { p_code: c, p_kind: kind });
+      setFolders(r.folders || []);
+      setItems(r.items || []);
+      setAuthed(true);
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+  useEffect(() => {
+    if (code) refresh(code);
+  }, []);
+
+  const submitCode = async () => {
+    const c = codeInput.trim();
+    if (!c) return;
+    setBusy(true);
+    setError('');
+    try {
+      const ok = await cloud('booth_check', { p_code: c });
+      if (!ok) {
+        setError(tr('The team code is not correct.'));
+        setBusy(false);
+        return;
+      }
+      storeTeamCode(c);
+      setCode(c);
+      await refresh(c);
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+    }
+  };
+
+  const run = async (fn, args) => {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await cloud(fn, { p_code: code, ...args });
+      await refresh();
+      return r;
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+      return null;
+    }
+  };
+  const folderId = sel === 'all' || sel === 'none' ? null : sel;
+  const saveNew = async () => {
+    const name = saveName.trim() || cur.name;
+    const r = await run('booth_save_item', {
+      p_item: { kind, name, folder_id: folderId, data: cur.data, thumbnail: cur.thumbnail },
+    });
+    if (r) setCurrentId(r.id);
+  };
+  const overwrite = async () => {
+    await run('booth_save_item', { p_item: { id: currentId, data: cur.data, thumbnail: cur.thumbnail } });
+  };
+  const open = async (it) => {
+    setBusy(true);
+    try {
+      const full = await cloud('booth_get_item', { p_code: code, p_id: it.id });
+      if (full) {
+        onOpen(full);
+        setCurrentId(full.id);
+        onClose();
+      }
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+  const newFolder = () => setEditing({ type: 'newFolder' });
+  const createFolder = async (name) => {
+    setEditing(null);
+    const r = await run('booth_save_folder', { p_folder: { kind, name, parent_id: folderId } });
+    if (r) setSel(r.id);
+  };
+  const renameFolder = (f) => setEditing({ type: 'folder', id: f.id });
+  const saveFolderName = async (f, name) => {
+    setEditing(null);
+    await run('booth_save_folder', { p_folder: { id: f.id, name } });
+  };
+  const deleteFolder = (f) =>
+    setAsk({
+      text: `“${f.name}” ` + tr('Delete this folder? What is inside moves up one level.'),
+      yes: tr('Delete'),
+      onYes: async () => {
+        await run('booth_delete_folder', { p_id: f.id });
+        setSel('all');
+      },
+    });
+  const renameItem = (it) => setEditing({ type: 'item', id: it.id });
+  const saveItemName = async (it, name) => {
+    setEditing(null);
+    await run('booth_save_item', { p_item: { id: it.id, name } });
+  };
+  const moveItem = async (it, fid) => {
+    await run('booth_save_item', { p_item: { id: it.id, folder_id: fid || '' } });
+  };
+  const deleteItem = (it) =>
+    setAsk({
+      text: `“${it.name}” ` + tr('will be deleted for everyone on the team.'),
+      yes: tr('Delete'),
+      onYes: async () => {
+        await run('booth_delete_item', { p_id: it.id });
+        if (it.id === currentId) setCurrentId(null);
+      },
+    });
+  const importLocal = async () => {
+    if (!localImport) return;
+    setBusy(true);
+    try {
+      let n = 0;
+      for (const d of localImport.list) {
+        await cloud('booth_save_item', { p_code: code, p_item: { kind, name: d.name, folder_id: folderId, data: d.data } });
+        n++;
+      }
+      localImport.done();
+      await refresh();
+      setNotice(`${n} ${tr('designs uploaded.')}`);
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+    }
+  };
+
+  // folder tree, nested by parent
+  const childrenOf = (pid) => folders.filter((f) => (f.parent_id || null) === pid);
+  const flat = [];
+  const walk = (pid, depth) =>
+    childrenOf(pid).forEach((f) => {
+      flat.push({ f, depth });
+      walk(f.id, depth + 1);
+    });
+  walk(null, 0);
+  const shown = items.filter((it) =>
+    sel === 'all' ? true : sel === 'none' ? !it.folder_id : it.folder_id === sel
+  );
+  const rowCls = (on) =>
+    'w-full text-left text-xs px-2 py-1.5 rounded flex items-center gap-1.5 ' +
+    (on ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-white');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }} onClick={onClose}>
+      <div
+        className="relative bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ width: 'min(960px, 94vw)', height: 'min(640px, 90vh)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {ask && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.7)' }}>
+            <div className="bg-white rounded-lg shadow-xl border p-4 w-80" style={{ borderColor: UI_LINE }}>
+              <div className="text-sm text-gray-800 mb-4 leading-relaxed">{ask.text}</div>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setAsk(null)} className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:border-gray-400">
+                  {tr('Cancel')}
+                </button>
+                <button
+                  autoFocus
+                  onClick={() => {
+                    const a = ask;
+                    setAsk(null);
+                    a.onYes();
+                  }}
+                  className="text-xs font-medium px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700"
+                >
+                  {ask.yes}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="flex-none flex items-center gap-2 px-4 h-12 border-b" style={{ borderColor: UI_LINE }}>
+          <FolderOpen className="w-4 h-4 text-gray-600" />
+          <span className="text-sm font-semibold">{title}</span>
+          <span className="text-xs text-gray-400">{tr('Shared with the team')}</span>
+          <span className="flex-1" />
+          {busy && <span className="text-xs text-gray-400">{tr('Working…')}</span>}
+          <button onClick={onClose} className="p-1.5 rounded text-gray-500 hover:bg-gray-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {!authed ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
+            <div className="text-sm font-medium">{tr('Enter the team code')}</div>
+            <div className="text-xs text-gray-500 text-center max-w-sm">
+              {tr('Saved layouts and proposals are shared by everyone on the team. This computer will remember the code.')}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={codeInput}
+                onChange={(e) => setCodeInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && submitCode()}
+                className="text-sm border border-gray-300 rounded px-3 py-1.5 w-56"
+                autoFocus
+              />
+              <button onClick={submitCode} className="text-xs font-medium px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-700">
+                {tr('Open')}
+              </button>
+            </div>
+            {error && <div className="text-xs text-red-600">{error}</div>}
+          </div>
+        ) : (
+          <>
+            {/* save the current work */}
+            <div className="flex-none flex items-center gap-2 px-4 py-2.5 border-b" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+              <span className="text-xs text-gray-500 whitespace-nowrap">{tr('Save current work')}</span>
+              <input
+                type="text"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                className="flex-1 min-w-0 text-xs border border-gray-300 rounded px-2 py-1.5 bg-white"
+              />
+              <span className="text-xs text-gray-500 whitespace-nowrap">
+                → {folderId ? (folders.find((f) => f.id === folderId) || {}).name : tr('No folder')}
+              </span>
+              <button onClick={saveNew} className="text-xs font-medium px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-700 whitespace-nowrap">
+                {tr('Save as new')}
+              </button>
+              {currentId && items.some((it) => it.id === currentId) && (
+                <button onClick={overwrite} className="text-xs px-3 py-1.5 rounded border border-gray-300 bg-white hover:border-gray-400 whitespace-nowrap">
+                  {tr('Overwrite')} “{(items.find((it) => it.id === currentId) || {}).name}”
+                </button>
+              )}
+            </div>
+
+            <div className="flex-1 flex min-h-0">
+              {/* folders */}
+              <div className="flex-none w-60 border-r overflow-y-auto p-2" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+                <button onClick={() => setSel('all')} className={rowCls(sel === 'all')}>
+                  {tr('All')} <span className="opacity-60">{items.length}</span>
+                </button>
+                <button onClick={() => setSel('none')} className={rowCls(sel === 'none')}>
+                  {tr('No folder')} <span className="opacity-60">{items.filter((it) => !it.folder_id).length}</span>
+                </button>
+                <div className="my-2 border-t" style={{ borderColor: UI_LINE }} />
+                {(() => {
+                  const newRow = (depth) => (
+                    <div key="new" className="flex items-center gap-1.5 py-0.5" style={{ paddingLeft: depth * 14 + 8 }}>
+                      <FolderOpen className="w-3.5 h-3.5 flex-none text-gray-500" />
+                      <InlineName
+                        placeholder={tr('Folder name')}
+                        onCommit={createFolder}
+                        onCancel={() => setEditing(null)}
+                        className="flex-1"
+                      />
+                    </div>
+                  );
+                  const rows = [];
+                  const addingNew = editing && editing.type === 'newFolder';
+                  if (addingNew && !folderId) rows.push(newRow(0));
+                  flat.forEach(({ f, depth }) => {
+                    rows.push(
+                      <div key={f.id} className="group flex items-center" style={{ paddingLeft: depth * 14 }}>
+                        {editing && editing.type === 'folder' && editing.id === f.id ? (
+                          <div className="flex-1 flex items-center gap-1.5 px-2 py-0.5">
+                            <FolderOpen className="w-3.5 h-3.5 flex-none text-gray-500" />
+                            <InlineName
+                              initial={f.name}
+                              onCommit={(n) => saveFolderName(f, n)}
+                              onCancel={() => setEditing(null)}
+                              className="flex-1"
+                            />
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setSel(f.id)}
+                            onDoubleClick={() => renameFolder(f)}
+                            className={rowCls(sel === f.id) + ' flex-1 min-w-0'}
+                          >
+                            <FolderOpen className="w-3.5 h-3.5 flex-none" />
+                            <span className="truncate">{f.name}</span>
+                            <span className="opacity-60">{items.filter((it) => it.folder_id === f.id).length}</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                    if (addingNew && folderId === f.id) rows.push(newRow(depth + 1));
+                  });
+                  return rows;
+                })()}
+                <button onClick={newFolder} className="w-full mt-2 text-xs px-2 py-1.5 rounded border border-dashed border-gray-300 text-gray-600 hover:bg-white">
+                  + {folderId ? tr('New folder inside') : tr('New folder')}
+                </button>
+                {folderId && (
+                  <div className="flex gap-1 mt-1">
+                    <button onClick={() => renameFolder(folders.find((f) => f.id === folderId))} className="flex-1 text-xs px-2 py-1 rounded text-gray-600 hover:bg-white">
+                      {tr('Rename')}
+                    </button>
+                    <button onClick={() => deleteFolder(folders.find((f) => f.id === folderId))} className="flex-1 text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50">
+                      {tr('Delete')}
+                    </button>
+                  </div>
+                )}
+                {localImport && localImport.list.length > 0 && (
+                  <button onClick={importLocal} className="w-full mt-4 text-[11px] px-2 py-1.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-left">
+                    {tr('Upload designs saved on this computer')} ({localImport.list.length})
+                  </button>
+                )}
+              </div>
+
+              {/* items */}
+              <div className="flex-1 overflow-y-auto p-3">
+                {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
+                {notice && (
+                  <div className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1.5 mb-2 flex items-center">
+                    <span className="flex-1">{notice}</span>
+                    <button onClick={() => setNotice('')} className="p-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                {shown.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-xs text-gray-400">{tr('Nothing saved here yet.')}</div>
+                ) : (
+                  <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))' }}>
+                    {shown.map((it) => (
+                      <div key={it.id} className={'rounded-lg border bg-white overflow-hidden ' + (it.id === currentId ? 'border-gray-900' : 'border-gray-200')}>
+                        <button onClick={() => open(it)} className="block w-full aspect-[16/10] bg-gray-100" title={tr('Open')}>
+                          {it.thumbnail ? (
+                            <img src={it.thumbnail} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <Box className="w-6 h-6 mx-auto text-gray-300" />
+                          )}
+                        </button>
+                        <div className="p-2">
+                          {editing && editing.type === 'item' && editing.id === it.id ? (
+                            <InlineName
+                              initial={it.name}
+                              onCommit={(n) => saveItemName(it, n)}
+                              onCancel={() => setEditing(null)}
+                              className="w-full"
+                            />
+                          ) : (
+                            <div className="text-xs font-medium text-gray-900 truncate" onDoubleClick={() => renameItem(it)}>
+                              {it.name}
+                            </div>
+                          )}
+                          <div className="text-[11px] text-gray-400">{new Date(it.updated_at).toLocaleString()}</div>
+                          <div className="flex items-center gap-1 mt-1.5">
+                            <button onClick={() => open(it)} className="text-[11px] px-1.5 py-0.5 rounded bg-gray-900 text-white">
+                              {tr('Open')}
+                            </button>
+                            <button onClick={() => renameItem(it)} className="text-[11px] px-1.5 py-0.5 rounded border border-gray-300 text-gray-700">
+                              {tr('Rename')}
+                            </button>
+                            <select
+                              value={it.folder_id || ''}
+                              onChange={(e) => moveItem(it, e.target.value)}
+                              title={tr('Move to folder')}
+                              className="flex-1 min-w-0 text-[11px] border border-gray-300 rounded px-1 py-0.5 bg-white"
+                            >
+                              <option value="">{tr('No folder')}</option>
+                              {flat.map(({ f, depth }) => (
+                                <option key={f.id} value={f.id}>
+                                  {'\u00a0'.repeat(depth * 2)}
+                                  {f.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button onClick={() => deleteItem(it)} className="p-0.5 rounded text-gray-400 hover:text-red-600">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* Start screen: pick the booth planner or the buyer configurator. */
+function StartScreen() {
+  const [lang, setLangState] = useState(loadLang);
+  _lang = lang;
+  const setLang = (l) => {
+    setLangState(l);
+    try {
+      window.localStorage.setItem('hbs-lang', l);
+    } catch (e) {
+      /* storage unavailable */
+    }
+  };
+  const cards = [
+    {
+      mode: 'booth',
+      icon: <Layers className="w-6 h-6" />,
+      title: 'Trade show booth planner',
+      body: 'Lay out a booth for an overseas trade show: products, display items, staff and visitors.',
+      who: 'For our team',
+    },
+    {
+      mode: 'buyer',
+      icon: <Box className="w-6 h-6" />,
+      title: 'Buyer proposal configurator',
+      body: 'Set a shelf size and colors, compare colors side by side, and export a proposal image for a buyer.',
+      who: 'For our team: buyer proposals',
+    },
+  ];
+  return (
+    <div
+      className="h-screen w-screen flex flex-col items-center justify-center text-gray-900"
+      style={{ backgroundColor: UI_PANEL, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }}
+    >
+      <div className="absolute top-4 right-4 flex gap-1">
+        {[
+          ['en', 'EN'],
+          ['ko', '한국어'],
+        ].map(([code, name]) => (
+          <button
+            key={code}
+            onClick={() => setLang(code)}
+            className={'text-xs px-2 py-1 rounded ' + (lang === code ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-white')}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <img src={HOMEDANT_WORDMARK_URL} alt="HOMEDANT" className="h-7 mb-3" />
+      <div className="text-sm text-gray-500 mb-10">{tr('Shelf simulator')}</div>
+      <div className="flex gap-5">
+        {cards.map((c) => (
+          <button
+            key={c.mode}
+            onClick={() => openApp(c.mode)}
+            className="w-80 text-left bg-white border border-gray-200 rounded-xl p-6 hover:border-gray-900 hover:shadow-md transition"
+          >
+            <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center text-gray-800 mb-4">{c.icon}</div>
+            <div className="text-base font-semibold mb-1.5">{tr(c.title)}</div>
+            <div className="text-sm text-gray-600 leading-relaxed mb-4">{tr(c.body)}</div>
+            <div className="text-xs text-gray-400">{tr(c.who)}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function SimulatorApp() {
+  if (!APP_MODE) return <StartScreen />;
+  return <BoothSimulator />;
+}
+
+function BoothSimulator() {
   // ----- state -----
-  const [booth, setBooth] = useState({
+  const [booth, setBooth] = useState(BUYER_MODE ? {
+    width: 30000,
+    depth: 30000,
+    wallHeight: 2438,
+    unit: 'mm',
+    style: 'studio',
+    look: 'studio',
+  } : {
     width: 3048, // 10ft in mm  (10ft x 10ft default)
     depth: 3048, // 10ft in mm
     wallHeight: 2438, // 8ft in mm
@@ -3821,6 +5797,16 @@ export default function BoothSimulator() {
   const [warnings, setWarnings] = useState({}); // instanceId -> reason
   // current layout name (used in exported PNG filenames)
   const [layoutName, setLayoutName] = useState('layout1');
+  const [openMenu, setOpenMenu] = useState(null); // header menus and booth settings
+  // buyer configurator: one product, optionally shown in several colours
+  const [buyerBase, setBuyerBase] = useState(() => (BUYER_MODE ? newBuyerProduct(BUYER_TEMPLATES[0]) : null));
+  const [buyerCompare, setBuyerCompare] = useState([]);
+  // shared library: which saved item the current work came from
+  const [cloudId, setCloudId] = useState(null);
+  const [showCloud, setShowCloud] = useState(false);
+  // buyer app: the shared list and the buyer (folder) being worked on
+  const buyerLib = useCloudList('buyer', BUYER_MODE);
+  const [buyerFolder, setBuyerFolder] = useState(null);
   // saved designs library (persisted in localStorage)
   const [savedDesigns, setSavedDesigns] = useState([]);
   const [showLibrary, setShowLibrary] = useState(false);
@@ -3841,6 +5827,8 @@ export default function BoothSimulator() {
   const productsGroupRef = useRef(null);
   const meshMapRef = useRef(new Map()); // instanceId -> THREE.Group
   const dragRef = useRef(null);
+  const levelDragRef = useRef(null); // dragging one shelf level in 3D
+  const [levelTip, setLevelTip] = useState(null); // height label by the cursor
   const animationIdRef = useRef(null);
   const productsRef = useRef(products);
   const selectedRef = useRef(selectedId);
@@ -3979,7 +5967,12 @@ export default function BoothSimulator() {
     // keep the shadow area matched to the current booth size
     const keyLight =
       sceneRef.current && sceneRef.current.getObjectByName('keyLight');
-    if (keyLight) fitShadowToBooth(keyLight, w, d, wh);
+    // (the studio floor is huge, but its products stand in the middle)
+    if (keyLight) fitShadowToBooth(keyLight, booth.style === 'studio' ? 7 : w, booth.style === 'studio' ? 5 : d, wh);
+    // buyer view shows the product alone: no floor and no cast shadows,
+    // the lights still shade its faces
+    const studio = booth.style === 'studio';
+    if (keyLight) keyLight.castShadow = !studio;
 
     // floor
     const floorGeo = new THREE.PlaneGeometry(w, d);
@@ -3994,7 +5987,7 @@ export default function BoothSimulator() {
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     floor.userData.isFloor = true;
-    group.add(floor);
+    if (!studio) group.add(floor);
 
     if (look.grid) {
       const grid = new THREE.GridHelper(
@@ -4020,7 +6013,9 @@ export default function BoothSimulator() {
       group.add(aisle);
     }
 
-    if (booth.style === 'curtain') {
+    if (booth.style === 'studio') {
+      // buyer configurator: products on a plain floor, no booth walls
+    } else if (booth.style === 'curtain') {
       // ---- CURTAIN BOOTH (pipe & drape) ----
       // Matches a real inline curtain booth: a TALL back curtain (full
       // wall height) and SHORT side curtains (~3ft vs 8ft = ~0.375 of
@@ -4236,11 +6231,11 @@ export default function BoothSimulator() {
       const tpl = PRODUCT_LIBRARY.find((t) => t.id === p.productId);
       if (!tpl) return;
       let mesh = map.get(p.instanceId);
-      const fingerprint = `${p.width}-${p.depth}-${p.height}-${p.tier}-${p.frameColor}-${p.boardColor}-${p.shelfStyle || 'basic'}-${p.levelsKey || ''}-${
+      const fingerprint = `${p.caption || ''}-${p.width}-${p.depth}-${p.height}-${p.tier}-${p.frameColor}-${p.boardColor}-${p.shelfStyle || 'basic'}-${p.levelsKey || ''}-${
         Array.isArray(p.levels)
           ? p.levels.map((l) => `${l.h}${l.style}`).join('.')
           : ''
-      }-${p.hangers || ''}-${
+      }-${p.hangers || ''}-${p.staffName || ''}|${p.staffSay ?? ''}|${p.staffGlasses ? 'G' : ''}${p.staffHair || ''}${p.staffShirt || ''}-${
         p.showItems
           ? `items${propsReady ? 'R' : ''}${JSON.stringify(p.itemPicks || '')}${p.baseItem || ''}`
           : ''
@@ -4251,6 +6246,12 @@ export default function BoothSimulator() {
           disposeGroup(mesh);
         }
         mesh = buildProductMesh(p, tpl);
+        if (BUYER_MODE) mesh.add(makeContactShadow(p.width * MM_TO_M, p.depth * MM_TO_M));
+        if (p.caption) {
+          const cap = makeSpeechBubble(p.caption, 0.55);
+          cap.position.set(0, (p.height * MM_TO_M) + 0.12, 0);
+          mesh.add(cap);
+        }
         mesh.userData.instanceId = p.instanceId;
         mesh.userData.fingerprint = fingerprint;
         // tag children for picking
@@ -4372,6 +6373,42 @@ export default function BoothSimulator() {
     return null;
   }, []);
 
+  // like pickInstanceId, but also says which shelf level was hit
+  const pickLevelHit = useCallback((event) => {
+    const renderer = rendererRef.current;
+    const camera = cameraRef.current;
+    const productsGroup = productsGroupRef.current;
+    if (!renderer || !camera || !productsGroup) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(
+      { x: ((event.clientX - rect.left) / rect.width) * 2 - 1, y: -((event.clientY - rect.top) / rect.height) * 2 + 1 },
+      camera
+    );
+    const hits = ray.intersectObjects(productsGroup.children, true);
+    for (const h of hits) {
+      // only solid parts: the selection outline is made of lines
+      if (!h.object.isMesh || h.object.isSprite) continue;
+      let o = h.object,
+        level;
+      while (o) {
+        if (level === undefined && o.userData && o.userData.hhLevel !== undefined) level = o.userData.hhLevel;
+        if (o.userData && o.userData.instanceId) return { id: o.userData.instanceId, level, point: h.point };
+        o = o.parent;
+      }
+    }
+    return null;
+  }, []);
+
+  // which product can have its levels dragged in 3D, and its levels
+  const levelTarget = (id) => {
+    const p = productsRef.current.find((q) => q.instanceId === id);
+    if (!p) return null;
+    const tpl = PRODUCT_LIBRARY.find((t) => t.id === p.productId);
+    if (!tpl || !isLevelProduct(tpl) || !HH_LEVEL_TYPES.includes(tpl.type)) return null;
+    return { p, levels: hhResolveLevels(p, p.tier || tpl.defaultTier) };
+  };
+
   const getFloorPoint = useCallback((event) => {
     const renderer = rendererRef.current;
     const camera = cameraRef.current;
@@ -4389,6 +6426,33 @@ export default function BoothSimulator() {
 
   const onCanvasMouseDown = (e) => {
     if (e.button !== 0) return; // only left click for products
+    if (BUYER_MODE) return;
+    // grabbing a level of the shelf that is already selected moves that
+    // level up and down instead of moving the shelf
+    if (viewMode !== 'top' && selectedId) {
+      const hit = pickLevelHit(e);
+      const target = hit && hit.id === selectedId && hit.level !== undefined ? levelTarget(hit.id) : null;
+      if (target) {
+        const cam = cameraRef.current;
+        const n = new THREE.Vector3();
+        cam.getWorldDirection(n);
+        n.y = 0;
+        if (n.lengthSq() > 1e-4) {
+          n.normalize();
+          levelDragRef.current = {
+            id: hit.id,
+            level: hit.level,
+            plane: new THREE.Plane().setFromNormalAndCoplanarPoint(n, hit.point),
+            startY: hit.point.y,
+            startH: target.levels[hit.level].h,
+            levels: target.levels,
+          };
+          controlsRef.current.enabled = false;
+          e.stopPropagation();
+          return;
+        }
+      }
+    }
     const id = pickInstanceId(e);
     if (id) {
       setSelectedId(id);
@@ -4409,17 +6473,60 @@ export default function BoothSimulator() {
     }
   };
 
+  const showLevelTip = (e, text) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setLevelTip({ x: e.clientX - rect.left, y: e.clientY - rect.top, text });
+  };
   const onCanvasMouseMove = (e) => {
+    const ld = levelDragRef.current;
+    if (ld) {
+      const renderer = rendererRef.current;
+      const rect = renderer.domElement.getBoundingClientRect();
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(
+        { x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 },
+        cameraRef.current
+      );
+      const pt = new THREE.Vector3();
+      if (ray.ray.intersectPlane(ld.plane, pt)) {
+        const p = productsRef.current.find((q) => q.instanceId === ld.id);
+        const next = p && hhMoveLevel(p, ld.levels, ld.level, ld.startH + (pt.y - ld.startY) * 1000);
+        if (next) {
+          ld.levels = next;
+          setProducts((prev) =>
+            prev.map((q) => (q.instanceId === ld.id ? { ...q, levels: next, levelsKey: hhLevelKey(q) } : q))
+          );
+        }
+        showLevelTip(e, `${ld.levels[ld.level].h} mm`);
+      }
+      return;
+    }
     const drag = dragRef.current;
-    if (!drag) return;
+    if (!drag) {
+      // hovering a level of the selected shelf: show it can be dragged
+      if (viewMode !== 'top' && selectedId) {
+        const hit = pickLevelHit(e);
+        const target = hit && hit.id === selectedId && hit.level !== undefined ? levelTarget(hit.id) : null;
+        e.currentTarget.style.cursor = target ? 'ns-resize' : '';
+        if (target) showLevelTip(e, `${target.levels[hit.level].h} mm`);
+        else if (levelTip) setLevelTip(null);
+      }
+      return;
+    }
     const dx = Math.abs(e.clientX - drag.startClientX);
     const dy = Math.abs(e.clientY - drag.startClientY);
     if (!drag.moved && dx + dy < 4) return;
     drag.moved = true;
     const floorPt = getFloorPoint(e);
     if (!floorPt) return;
-    const newX = floorPt.x + drag.offsetX;
-    const newZ = floorPt.z + drag.offsetZ;
+    let newX = floorPt.x + drag.offsetX;
+    let newZ = floorPt.z + drag.offsetZ;
+    const dragged = productsRef.current.find((p) => p.instanceId === drag.instanceId);
+    if (dragged) {
+      const c = clampToBooth({ ...dragged, position: { x: newX, z: newZ } }, booth.width, booth.depth);
+      newX = c.x;
+      newZ = c.z;
+    }
     // live mesh update for smoothness
     const mesh = meshMapRef.current.get(drag.instanceId);
     if (mesh) {
@@ -4431,6 +6538,12 @@ export default function BoothSimulator() {
   };
 
   const onCanvasMouseUp = () => {
+    if (levelDragRef.current) {
+      levelDragRef.current = null;
+      setLevelTip(null);
+      if (controlsRef.current) controlsRef.current.enabled = true;
+      return;
+    }
     const drag = dragRef.current;
     if (drag) {
       if (drag.moved && drag.lastX !== undefined) {
@@ -4478,21 +6591,29 @@ export default function BoothSimulator() {
         rotation: 0,
         addOns: [],
       };
-      setProducts((prev) => [...prev, newProduct]);
+      setProducts((prev) => [...prev, keepIn(newProduct, booth)]);
       setSelectedId(id);
     },
-    [booth.depth]
+    [booth]
   );
 
   const updateSelected = useCallback(
     (patch) => {
       if (!selectedId) return;
       setProducts((prev) =>
-        prev.map((p) => (p.instanceId === selectedId ? { ...p, ...patch } : p))
+        prev.map((p) => (p.instanceId === selectedId ? keepIn({ ...p, ...patch }, booth) : p))
       );
     },
-    [selectedId]
+    [selectedId, booth]
   );
+
+  // a smaller booth pulls everything back inside
+  useEffect(() => {
+    setProducts((prev) => {
+      const next = prev.map((p) => keepIn(p, booth));
+      return next.some((p, i) => p !== prev[i]) ? next : prev;
+    });
+  }, [booth.width, booth.depth]);
 
   const deleteSelected = useCallback(() => {
     if (!selectedId) return;
@@ -4510,20 +6631,20 @@ export default function BoothSimulator() {
       instanceId: newId,
       position: { x: orig.position.x + 0.3, z: orig.position.z + 0.3 },
     };
-    setProducts((prev) => [...prev, copy]);
+    setProducts((prev) => [...prev, keepIn(copy, booth)]);
     setSelectedId(newId);
-  }, [selectedId]);
+  }, [selectedId, booth]);
 
   const rotateSelected = useCallback(() => {
     if (!selectedId) return;
     setProducts((prev) =>
       prev.map((p) =>
         p.instanceId === selectedId
-          ? { ...p, rotation: ((p.rotation || 0) + 90) % 360 }
+          ? keepIn({ ...p, rotation: ((p.rotation || 0) + 90) % 360 }, booth)
           : p
       )
     );
-  }, [selectedId]);
+  }, [selectedId, booth]);
 
   /* ---------- save / load / export ---------- */
   const saveJSON = () => {
@@ -4576,6 +6697,96 @@ export default function BoothSimulator() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `${layoutName || 'booth'}_${Date.now()}.png`;
+    a.click();
+  };
+
+  /* ---------- buyer proposal image ----------
+     The current 3D view at twice the screen resolution, with a band
+     underneath: product, size, board, and each colour with its swatch
+     and HEX code. Always in English: it goes to overseas buyers.       */
+  const exportProposal = async (tpl) => {
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    if (!renderer || !scene || !camera || !buyerBase || !tpl) return;
+    const prevRatio = renderer.getPixelRatio();
+    renderer.setPixelRatio(2);
+    renderer.render(scene, camera);
+    const shot = new Image();
+    shot.src = renderer.domElement.toDataURL('image/png');
+    renderer.setPixelRatio(prevRatio);
+    renderer.render(scene, camera);
+    const logo = new Image();
+    logo.src = HOMEDANT_WORDMARK_URL;
+    await Promise.all([shot, logo].map((im) => (im.complete ? Promise.resolve() : new Promise((r) => (im.onload = im.onerror = r)))));
+
+    const W = shot.width;
+    const k = W / 1600; // scale for text and spacing
+    const band = Math.round(360 * k);
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = shot.height + band;
+    const x = c.getContext('2d');
+    x.fillStyle = '#ffffff';
+    x.fillRect(0, 0, c.width, c.height);
+    x.drawImage(shot, 0, 0);
+    x.fillStyle = '#e3e3df';
+    x.fillRect(0, shot.height, W, Math.max(1, Math.round(2 * k)));
+
+    const pad = Math.round(56 * k);
+    let y = shot.height + Math.round(56 * k);
+    const lh = Math.round(44 * k);
+    if (logo.width) x.drawImage(logo, pad, y - Math.round(26 * k), Math.round(26 * k * HOMEDANT_WORDMARK_ASPECT), Math.round(26 * k));
+    x.textBaseline = 'middle';
+    x.fillStyle = '#111111';
+    x.font = `600 ${Math.round(34 * k)}px Arial, sans-serif`;
+    const name = tpl.name.replace(/^House /, 'HOMEDANT HOUSE ');
+    x.fillText(name, pad, y + lh);
+    x.fillStyle = '#555555';
+    x.font = `${Math.round(24 * k)}px Arial, sans-serif`;
+    const tiers = tpl.type === 'open_base' ? buyerBase.tier - 1 : buyerBase.tier;
+    const board = buyerBase.boardColor === 'white' ? 'white face up' : 'wood face up';
+    const outer = hhOuterLabel(buyerBase);
+    x.fillText(
+      `Size ${buyerBase.width} x ${buyerBase.depth} x ${buyerBase.height}  ·  Outer dimensions W x D x H: ${outer.mm} (${outer.inch})`,
+      pad,
+      y + lh * 2
+    );
+    x.fillText(`${tiers} tiers  ·  Double-sided plywood, ${board}`, pad, y + lh * 2.8);
+    x.fillStyle = '#888888';
+    x.font = `${Math.round(19 * k)}px Arial, sans-serif`;
+    x.fillText(
+      'Colors are approximate on screen. Final colors are confirmed with a physical sample.  ' +
+        new Date().toISOString().slice(0, 10),
+      pad,
+      y + lh * 5
+    );
+
+    // colour swatches in a row under the size line
+    const sw = Math.round(30 * k);
+    let cx = pad;
+    const cy = y + lh * 3.9;
+    x.font = `${Math.round(22 * k)}px Arial, sans-serif`;
+    buyerColors.forEach((col) => {
+      const hex = '#' + frameHexOf(col).toString(16).padStart(6, '0').toUpperCase();
+      const known = SHELF_COLORS.find(([kk]) => kk === col);
+      x.fillStyle = hex;
+      x.beginPath();
+      x.arc(cx + sw / 2, cy, sw / 2, 0, Math.PI * 2);
+      x.fill();
+      x.strokeStyle = '#cccccc';
+      x.lineWidth = Math.max(1, k);
+      x.stroke();
+      x.fillStyle = '#222222';
+      const label = (known ? known[1] + '  ' : '') + hex;
+      x.fillText(label, cx + sw + Math.round(14 * k), cy);
+      cx += sw + Math.round(28 * k) + x.measureText(label).width + Math.round(36 * k);
+    });
+
+    const a = document.createElement('a');
+    a.href = c.toDataURL('image/png');
+    const colorPart = buyerColors.map((col) => (SHELF_COLORS.find(([kk]) => kk === col) || [col.replace('#', '')])[0]).join('-');
+    a.download = `HOMEDANT_${tpl.name.replace(/\s+/g, '')}_${buyerBase.width}x${buyerBase.depth}x${buyerBase.height}_${colorPart}.png`;
     a.click();
   };
 
@@ -4657,89 +6868,82 @@ export default function BoothSimulator() {
     window.setTimeout(() => setSaveStatus(''), 1800);
   };
 
-  /* Save the current booth to the Design Library.
-     - If we're already working on a saved design (currentDesignId set AND
-       that id still exists in the library) -> overwrite that entry.
-     - Otherwise -> ask for a name and add a new entry.
-     The `silent` flag (used by Ctrl+S) skips the name prompt when we
-     already have an entry to overwrite.                                 */
-  const saveDesign = (opts = {}) => {
-    const { silent = false } = opts;
-    // does our tracked id still exist? (it may have been deleted)
-    const existing = currentDesignId
-      ? savedDesigns.find((d) => d.id === currentDesignId)
-      : null;
-
-    if (existing) {
-      // --- overwrite the existing entry, keep its id + name ---
-      const updated = {
-        ...existing,
-        savedAt: new Date().toISOString(),
-        booth: { ...booth },
-        products: products.map((p) => ({ ...p })),
-      };
-      const next = savedDesigns.map((d) =>
-        d.id === existing.id ? updated : d
-      );
-      setSavedDesigns(next);
-      persistDesigns(next);
-      flashSaved(`${tr('Saved')} “${existing.name}”`);
-      return;
-    }
-
-    // --- no existing entry -> create a new one ---
-    // (silent saves still need a name the very first time)
-    const name = window.prompt(
-      tr('Save design as:'),
-      layoutName || 'New Booth Design'
-    );
-    if (!name) return;
-    const design = {
-      id: `d_${Date.now()}`,
-      name: name.trim(),
-      savedAt: new Date().toISOString(),
-      booth: { ...booth },
-      products: products.map((p) => ({ ...p })),
-    };
-    const next = [...savedDesigns, design];
-    setSavedDesigns(next);
-    persistDesigns(next);
-    setLayoutName(name.trim());
-    setCurrentDesignId(design.id); // track it so future saves overwrite
-    if (!silent) setShowLibrary(true);
-    flashSaved(`${tr('Saved')} “${design.name}”`);
+  // small JPEG of the current view, for the library cards
+  const makeThumb = () => {
+    const renderer = rendererRef.current;
+    if (!renderer || !sceneRef.current || !cameraRef.current) return null;
+    renderer.render(sceneRef.current, cameraRef.current);
+    const src = renderer.domElement;
+    const c = document.createElement('canvas');
+    c.width = 320;
+    c.height = 200;
+    const x = c.getContext('2d');
+    const s0 = Math.max(320 / src.width, 200 / src.height);
+    const w = src.width * s0,
+      h = src.height * s0;
+    x.drawImage(src, (320 - w) / 2, (200 - h) / 2, w, h);
+    return c.toDataURL('image/jpeg', 0.72);
   };
-
-  const loadDesign = (design) => {
-    if (!design) return;
-    if (design.booth) setBooth(design.booth);
-    if (Array.isArray(design.products)) {
-      setProducts(design.products.map((p) => ({ ...p })));
+  // what "save" stores, for each app
+  const currentWork = () =>
+    BUYER_MODE
+      ? {
+          name: `${buyerBase ? buyerBase.name : ''} · ${buyerColors.map((c) => colorLabel(c).split(' #')[0]).join(', ')}`,
+          data: { base: buyerBase, compare: buyerCompare },
+          thumbnail: makeThumb(),
+        }
+      : {
+          name: layoutName || 'Booth layout',
+          data: { booth: { ...booth }, products: products.map((p) => ({ ...p })), layoutName },
+          thumbnail: makeThumb(),
+        };
+  const openWork = (item) => {
+    const d = item.data || {};
+    if (BUYER_MODE) {
+      if (d.base) setBuyerBase(d.base);
+      setBuyerCompare(Array.isArray(d.compare) ? d.compare : []);
+    } else {
+      if (d.booth) setBooth(d.booth);
+      if (Array.isArray(d.products)) setProducts(d.products.map((p) => ({ ...p })));
       setSelectedId(null);
+      setLayoutName(item.name);
     }
-    if (design.name) setLayoutName(design.name);
-    setCurrentDesignId(design.id); // now editing this saved design
   };
-
-  const deleteDesign = (id) => {
-    const next = savedDesigns.filter((d) => d.id !== id);
-    setSavedDesigns(next);
-    persistDesigns(next);
-    // if we deleted the design we were tracking, forget it so the next
-    // save creates a fresh entry instead of silently failing
-    if (currentDesignId === id) setCurrentDesignId(null);
+  /* Save: overwrite the shared item this work came from, or open the
+     library to save it somewhere the first time. Ctrl+S does the same. */
+  const saveDesign = async () => {
+    const code = loadTeamCode();
+    if (BUYER_MODE && !cloudId && code && buyerLib.authed) {
+      const cur = currentWork();
+      const r = await buyerLib.run('booth_save_item', {
+        p_item: { kind: 'buyer', name: cur.name, folder_id: buyerFolder, data: cur.data, thumbnail: cur.thumbnail },
+      });
+      if (r) {
+        setCloudId(r.id);
+        flashSaved(tr('Saved'));
+        return;
+      }
+    }
+    if (cloudId && code) {
+      const cur = currentWork();
+      try {
+        await cloud('booth_save_item', { p_code: code, p_item: { id: cloudId, data: cur.data, thumbnail: cur.thumbnail } });
+        flashSaved(tr('Saved'));
+        if (BUYER_MODE) buyerLib.refresh();
+        return;
+      } catch (e) {
+        /* fall through to the library, which shows what went wrong */
+      }
+    }
+    setShowCloud(true);
   };
-
-  const renameDesign = (id) => {
-    const design = savedDesigns.find((d) => d.id === id);
-    if (!design) return;
-    const newName = window.prompt(tr('Rename design:'), design.name);
-    if (!newName) return;
-    const next = savedDesigns.map((d) =>
-      d.id === id ? { ...d, name: newName.trim() } : d
-    );
-    setSavedDesigns(next);
-    persistDesigns(next);
+  // designs saved in this browser before the shared library existed
+  const localImport = {
+    list: savedDesigns.map((d) => ({ name: d.name, data: { booth: d.booth, products: d.products, layoutName: d.name } })),
+    done: () => {
+      setSavedDesigns([]);
+      persistDesigns([]);
+    },
   };
 
   // keep the ref pointing at the latest saveDesign (closes over current state)
@@ -4824,7 +7028,7 @@ export default function BoothSimulator() {
     : null;
 
   // group products by category for left panel
-  const filteredProducts = PRODUCT_LIBRARY.filter((p) =>
+  const filteredProducts = PRODUCT_LIBRARY.filter((p) => !p.hidden).filter((p) =>
     activeBrand === 'SPEEDRACK'
       ? p.brand === 'SPEEDRACK'
       : activeBrand === 'HOMEDANT HOUSE'
@@ -4832,254 +7036,332 @@ export default function BoothSimulator() {
       : p.brand === 'Exhibition'
   );
 
+  /* ---------- buyer configurator: what is on the floor ---------- */
+  const buyerColors = buyerBase
+    ? buyerCompare.length >= 2
+      ? buyerCompare
+      : [buyerBase.frameColor]
+    : [];
+  useEffect(() => {
+    if (!BUYER_MODE || !buyerBase) return;
+    const n = buyerColors.length;
+    const step = buyerBase.width * MM_TO_M + 0.45;
+    setProducts(
+      buyerColors.map((c, i) => ({
+        ...buyerBase,
+        instanceId: 'b' + i,
+        frameColor: c,
+        caption: n > 1 ? colorLabel(c) : '',
+        position: { x: (i - (n - 1) / 2) * step, z: 0 },
+        rotation: 0,
+      }))
+    );
+    setSelectedId(null);
+  }, [buyerBase, buyerCompare, lang]);
+  // frame the camera on the product(s) when what is shown changes size
+  useEffect(() => {
+    if (!BUYER_MODE || !buyerBase || !controlsRef.current) return;
+    const n = buyerColors.length;
+    const totalW = n * (buyerBase.width * MM_TO_M + 0.45);
+    const h = buyerBase.height * MM_TO_M;
+    controlsRef.current.target.set(0, h * 0.46, 0);
+    // a product-photo angle: a little above eye level, turned a bit
+    controlsRef.current.setView(
+      viewMode,
+      Math.max(totalW * 1.15, h * 1.55) + 0.6,
+      viewMode === 'front' ? { phi: Math.PI / 2 - 0.06, theta: 0 } : { phi: 1.22, theta: n > 1 ? 0.32 : 0.55 }
+    );
+  }, [buyerBase && buyerBase.productId, buyerBase && buyerBase.width, buyerBase && buyerBase.height, buyerColors.length, viewMode]);
+
   /* ============================================================
      RENDER
      ============================================================ */
+  if (BUYER_MODE && buyerBase) {
+    const tpl = PRODUCT_LIBRARY.find((t) => t.id === buyerBase.productId);
+    return (
+      <div
+        className="h-screen w-screen flex flex-col text-gray-900 overflow-hidden"
+        style={{ fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }}
+      >
+        <header className="flex-none border-b h-12 px-4 flex items-center gap-3" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+          <button onClick={() => openApp(null)} title={tr('Back to start')}>
+            <img src={HOMEDANT_WORDMARK_URL} alt="HOMEDANT" className="h-4" />
+          </button>
+          <span className="text-gray-300">/</span>
+          {(() => {
+            const folder = buyerFolder ? buyerLib.folders.find((f) => f.id === buyerFolder) : null;
+            const item = cloudId ? buyerLib.items.find((it) => it.id === cloudId) : null;
+            return (
+              <span className="text-sm min-w-0 truncate">
+                <span className={folder ? 'font-semibold' : 'text-gray-500'}>{folder ? folder.name : tr('No buyer selected')}</span>
+                <span className="text-gray-300"> / </span>
+                <span className="text-gray-500">{item ? item.name : tr('New proposal (not saved)')}</span>
+              </span>
+            );
+          })()}
+          <span className="flex-1" />
+          {[
+            ['en', 'EN'],
+            ['ko', '한국어'],
+          ].map(([code, name]) => (
+            <button
+              key={code}
+              onClick={() => setLang(code)}
+              className={'text-xs px-2 py-1 rounded ' + (lang === code ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-white')}
+            >
+              {name}
+            </button>
+          ))}
+          {saveStatus && (
+            <span className="text-xs text-gray-500 inline-flex items-center gap-1">
+              <Check className="w-3.5 h-3.5" /> {saveStatus}
+            </span>
+          )}
+          <button
+            onClick={() => saveDesign()}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+          >
+            <Save className="w-3.5 h-3.5" /> {tr('Save')}
+          </button>
+          <button
+            onClick={savePNG}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+          >
+            <Camera className="w-3.5 h-3.5" /> {tr('Save screen')}
+          </button>
+          <button
+            onClick={() => exportProposal(tpl)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-700"
+          >
+            <Download className="w-3.5 h-3.5" /> {tr('Export proposal image')}
+          </button>
+        </header>
+        <div className="flex-1 flex min-h-0">
+          <aside className="flex-none w-72 border-r overflow-y-auto" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+            <BuyerSidebar
+              lib={buyerLib}
+              folderId={buyerFolder}
+              setFolderId={setBuyerFolder}
+              cloudId={cloudId}
+              productId={buyerBase.productId}
+              onManage={() => setShowCloud(true)}
+              onOpenItem={async (it) => {
+                const full = await buyerLib.get(it.id);
+                if (!full) return;
+                openWork(full);
+                setCloudId(full.id);
+                setBuyerFolder(full.folder_id || null);
+              }}
+              onNewProposal={(fid) => {
+                setCloudId(null);
+                setBuyerFolder(fid || null);
+                setBuyerCompare([]);
+              }}
+              onPickProduct={(t) => {
+                // a different product on a saved proposal starts a new one
+                if (cloudId) {
+                  setCloudId(null);
+                  setBuyerCompare([]);
+                }
+                setBuyerBase((b) => newBuyerProduct(t, b));
+              }}
+            />
+          </aside>
+          <main className="flex-1 relative" style={{ backgroundColor: '#e6e6e3' }}>
+            <div ref={mountRef} className="absolute inset-0" />
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+              {[
+                ['3d', '3D'],
+                ['front', 'Front'],
+              ].map(([m, label]) => (
+                <ToolBtn key={m} active={viewMode === m} onClick={() => setViewMode(m)}>
+                  {tr(label)}
+                </ToolBtn>
+              ))}
+            </div>
+            <div className="absolute bottom-3 left-3 text-[11px] text-gray-500 pointer-events-none">
+              {tr('L-Drag')} {tr('rotate')} · {tr('R-Drag')} {tr('pan')} · {tr('Wheel')} {tr('zoom')}
+            </div>
+          </main>
+          <aside className="flex-none w-80 border-l overflow-y-auto" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+            <BuyerPanel
+              base={buyerBase}
+              tpl={tpl}
+              setBase={(patch) => setBuyerBase((b) => ({ ...b, ...patch }))}
+              compare={buyerCompare}
+              setCompare={setBuyerCompare}
+            />
+          </aside>
+        </div>
+        {showCloud && (
+          <CloudLibrary
+            kind="buyer"
+            title={tr('Buyer folders')}
+            getCurrent={currentWork}
+            onOpen={openWork}
+            currentId={cloudId}
+            setCurrentId={setCloudId}
+            onClose={() => {
+              setShowCloud(false);
+              buyerLib.refresh(loadTeamCode());
+            }}
+          />
+        )}
+      </div>
+    );
+  }
   return (
     <div
       className="h-screen w-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden"
       style={{ fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }}
     >
-      {/* TOP BAR */}
-      <header className="flex-none border-b border-gray-300 bg-white">
-        <div className="px-4 py-2 flex items-center gap-x-6 gap-y-2 flex-wrap">
-          {/* title */}
-          <div className="flex items-center pr-4 border-r border-gray-200">
-            <div className="text-sm font-semibold text-gray-900 tracking-tight whitespace-nowrap">
-              {tr('Booth Simulator')}
-            </div>
-            <div className="flex items-center gap-0.5 ml-3">
-              {[
-                ['en', 'EN'],
-                ['ko', '한국어'],
-              ].map(([code, name]) => (
-                <button
-                  key={code}
-                  onClick={() => setLang(code)}
-                  className={
-                    'text-xs px-1.5 py-0.5 rounded border transition ' +
-                    (lang === code
-                      ? 'bg-gray-900 text-white border-gray-900'
-                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50')
-                  }
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* booth dimensions */}
-          <div className="flex items-center gap-3">
-            <div className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-              {tr('Booth')}
-            </div>
-            <NumInput
-              label={tr('Width')}
-              valueMM={booth.width}
-              unit={booth.unit}
-              onChange={(mm) => setBooth({ ...booth, width: mm })}
-            />
-            <NumInput
-              label={tr('Depth')}
-              valueMM={booth.depth}
-              unit={booth.unit}
-              onChange={(mm) => setBooth({ ...booth, depth: mm })}
-            />
-            <NumInput
-              label={tr('Wall H')}
-              valueMM={booth.wallHeight}
-              unit={booth.unit}
-              onChange={(mm) => setBooth({ ...booth, wallHeight: mm })}
-            />
-            <select
-              value={booth.unit}
-              onChange={(e) => setBooth({ ...booth, unit: e.target.value })}
-              className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
-            >
-              <option value="ft">ft</option>
-              <option value="m">m</option>
-              <option value="cm">cm</option>
-              <option value="mm">mm</option>
-            </select>
-          </div>
-
-          {/* templates */}
-          <div className="flex items-center gap-1 pl-3 border-l border-gray-200">
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium mr-1">
-              {tr('Templates')}
-            </span>
-            <PresetBtn onClick={() => applyTemplate('10x10')}>
-              10×10 ft
-            </PresetBtn>
-            <PresetBtn onClick={() => applyTemplate('10x20')}>
-              10×20 ft
-            </PresetBtn>
-            <PresetBtn onClick={() => applyTemplate('20x20')}>
-              20×20 ft
-            </PresetBtn>
-          </div>
-
-          {/* booth style: wall vs curtain */}
-          <div className="flex items-center gap-1 pl-3 border-l border-gray-200">
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium mr-1">
-              {tr('Booth Type')}
-            </span>
-            <button
-              onClick={() => setBoothStyle('wall')}
-              className={
-                'text-xs px-2 py-1 rounded border transition ' +
-                (booth.style === 'wall'
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
-              }
-              title={tr('Solid panel walls')}
-            >
-              {tr('Wall Booth')}
+      {/* TOP BAR: layout on the left, the show in the middle, file
+          actions on the right */}
+      <header
+        className="flex-none border-b relative z-30"
+        style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}
+      >
+        <div className="px-4 h-12 grid items-center" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
+          <div className="flex items-center gap-2 min-w-0">
+            <button onClick={() => openApp(null)} title={tr('Back to start')} className="flex-none">
+              <img src={HOMEDANT_WORDMARK_URL} alt="HOMEDANT" className="h-4" />
             </button>
-            <button
-              onClick={() => setBoothStyle('curtain')}
-              className={
-                'text-xs px-2 py-1 rounded border transition ' +
-                (booth.style === 'curtain'
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
-              }
-              title={tr('Pole frame with fabric curtains')}
-            >
-              {tr('Curtain Booth')}
-            </button>
-          </div>
-
-          {/* look of the booth and the hall around it */}
-          <div className="flex items-center gap-1 pl-3 border-l border-gray-200">
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium mr-1">
-              {tr('Look')}
-            </span>
-            {Object.entries(BOOTH_LOOKS).map(([key, lk]) => (
-              <button
-                key={key}
-                onClick={() => setBoothLook(key)}
-                className={
-                  'text-xs px-2 py-1 rounded border transition ' +
-                  ((booth.look || DEFAULT_LOOK) === key
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
-                }
-                title={tr(lk.hint)}
-              >
-                {tr(lk.label)}
-              </button>
-            ))}
-            <button
-              onClick={() => setShowPeople((v) => !v)}
-              className={
-                'text-xs px-2 py-1 rounded border transition ml-1 ' +
-                (showPeople
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
-              }
-              title={tr('Show people walking past the booth')}
-            >
-              {tr('Visitors')}
-            </button>
-          </div>
-
-          {/* layout name + create new */}
-          <div className="flex items-center gap-1.5 pl-3 border-l border-gray-200">
-            <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-              {tr('Layout')}
-            </span>
+            <span className="text-gray-300">/</span>
             <input
               type="text"
               value={layoutName}
               onChange={(e) => setLayoutName(e.target.value)}
               placeholder={tr('layout name')}
-              className="text-xs border border-gray-300 rounded px-1.5 py-1 bg-white w-28"
+              className="text-sm text-gray-800 bg-transparent border border-transparent hover:border-gray-300 focus:border-gray-400 focus:bg-white rounded px-1.5 py-1 w-36 outline-none"
               title={tr('Used in exported PNG filenames')}
             />
-            <IconBtn
+            <button
               onClick={createLayout}
               title={tr('Start a new, empty booth layout')}
+              className="p-1.5 rounded text-gray-500 hover:bg-white hover:text-gray-900"
             >
-              <FilePlus className="w-3.5 h-3.5" /> {tr('Create Layout')}
-            </IconBtn>
+              <FilePlus className="w-4 h-4" />
+            </button>
+            {saveStatus && (
+              <span className="text-xs text-gray-500 inline-flex items-center gap-1 whitespace-nowrap">
+                <Check className="w-3.5 h-3.5" /> {saveStatus}
+              </span>
+            )}
           </div>
 
-          <div className="flex-1 min-w-0" />
+          {/* the show this booth is for */}
+          <input
+            type="text"
+            value={booth.show || ''}
+            onChange={(e) => setBooth({ ...booth, show: e.target.value })}
+            placeholder={tr('Type the show name')}
+            title={tr('Show name')}
+            className="text-center text-base font-semibold text-gray-900 placeholder:text-gray-400 placeholder:font-normal bg-transparent border border-transparent hover:border-gray-300 focus:border-gray-400 focus:bg-white rounded px-3 py-1 outline-none"
+            style={{ width: 'min(42vw, 520px)' }}
+          />
 
-          {/* actions */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <ViewBtn
-              active={viewMode === '3d'}
-              onClick={() => setViewMode('3d')}
+          <div className="flex items-center gap-1.5 justify-end">
+            <MenuButton
+              open={openMenu === 'designs'}
+              onToggle={() => setOpenMenu(openMenu === 'designs' ? null : 'designs')}
+              icon={<FolderOpen className="w-3.5 h-3.5" />}
+              label={tr('My designs')}
             >
-              <Box className="w-3.5 h-3.5" /> {tr('3D')}
-            </ViewBtn>
-            <ViewBtn
-              active={viewMode === 'top'}
-              onClick={() => setViewMode('top')}
+              <MenuItem
+                onClick={() => {
+                  setShowCloud(true);
+                  setOpenMenu(null);
+                }}
+              >
+                <Layers className="w-3.5 h-3.5" /> {tr('Design library')}
+              </MenuItem>
+              <label className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 cursor-pointer">
+                <Upload className="w-3.5 h-3.5" /> {tr('Open JSON file')}
+                <input
+                  type="file"
+                  accept=".json"
+                  hidden
+                  onChange={(e) => {
+                    if (e.target.files[0]) {
+                      loadJSON(e.target.files[0]);
+                      e.target.value = '';
+                    }
+                    setOpenMenu(null);
+                  }}
+                />
+              </label>
+            </MenuButton>
+            <MenuButton
+              open={openMenu === 'export'}
+              onToggle={() => setOpenMenu(openMenu === 'export' ? null : 'export')}
+              icon={<Download className="w-3.5 h-3.5" />}
+              label={tr('Export')}
             >
-              <Grid3x3 className="w-3.5 h-3.5" /> {tr('Top')}
-            </ViewBtn>
-            <ViewBtn
-              active={viewMode === 'front'}
-              onClick={() => setViewMode('front')}
-            >
-              <Eye className="w-3.5 h-3.5" /> {tr('Front')}
-            </ViewBtn>
-            <div className="w-px h-5 bg-gray-300 mx-1" />
-            <IconBtn onClick={savePNG} title={tr('Save current view as PNG')}>
-              <Camera className="w-3.5 h-3.5" /> {tr('PNG')}
-            </IconBtn>
-            <IconBtn
-              onClick={exportBoothImages}
-              title={tr('Export front / top / 45° views as 3 PNGs')}
-            >
-              <Camera className="w-3.5 h-3.5" /> {tr('Export Images')}
-            </IconBtn>
-            <div className="w-px h-5 bg-gray-300 mx-1" />
-            <IconBtn
+              <MenuItem
+                onClick={() => {
+                  setOpenMenu(null);
+                  savePNG();
+                }}
+              >
+                <Camera className="w-3.5 h-3.5" /> {tr('Current view (PNG)')}
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  setOpenMenu(null);
+                  exportBoothImages();
+                }}
+              >
+                <Camera className="w-3.5 h-3.5" /> {tr('Front, top and 45° (3 PNGs)')}
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  setOpenMenu(null);
+                  saveJSON();
+                }}
+              >
+                <Download className="w-3.5 h-3.5" /> {tr('Layout file (JSON)')}
+              </MenuItem>
+            </MenuButton>
+            <button
               onClick={() => saveDesign()}
               title={tr('Save this booth design to the in-app library')}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-700"
             >
-              <Save className="w-3.5 h-3.5" /> {tr('Save Design')}
-            </IconBtn>
-            <IconBtn
-              onClick={() => setShowLibrary((v) => !v)}
-              title={tr('Show / hide the Design Library')}
+              <Save className="w-3.5 h-3.5" /> {tr('Save')}
+            </button>
+            <MenuButton
+              open={openMenu === 'settings'}
+              onToggle={() => setOpenMenu(openMenu === 'settings' ? null : 'settings')}
+              icon={<Settings className="w-4 h-4" />}
+              iconOnly
+              label={tr('Language')}
             >
-              <Layers className="w-3.5 h-3.5" /> {tr('Library')}
-            </IconBtn>
-            <div className="w-px h-5 bg-gray-300 mx-1" />
-            <IconBtn onClick={saveJSON} title={tr('Download as JSON file')}>
-              <Download className="w-3.5 h-3.5" /> {tr('JSON')}
-            </IconBtn>
-            <label
-              title={tr('Load JSON file')}
-              className="cursor-pointer inline-flex items-center gap-1 text-xs px-2 py-1.5 rounded border border-gray-300 hover:bg-gray-50 transition"
-            >
-              <Upload className="w-3.5 h-3.5" /> {tr('Load')}
-              <input
-                type="file"
-                accept=".json"
-                hidden
-                onChange={(e) => {
-                  if (e.target.files[0]) {
-                    loadJSON(e.target.files[0]);
-                    e.target.value = '';
-                  }
-                }}
-              />
-            </label>
+              <div className="px-3 pt-2 pb-1 text-[11px] text-gray-500">{tr('Language')}</div>
+              {[
+                ['en', 'English'],
+                ['ko', '한국어'],
+              ].map(([code, name]) => (
+                <MenuItem
+                  key={code}
+                  onClick={() => {
+                    setLang(code);
+                    setOpenMenu(null);
+                  }}
+                >
+                  <span className="w-3.5">{lang === code && <Check className="w-3.5 h-3.5" />}</span> {name}
+                </MenuItem>
+              ))}
+            </MenuButton>
           </div>
         </div>
       </header>
+      {/* clicking anywhere else closes an open menu */}
+      {openMenu && <div className="fixed inset-0 z-20" onClick={() => setOpenMenu(null)} />}
 
       {/* MAIN AREA */}
       <div className="flex-1 flex overflow-hidden">
         {/* LEFT PANEL */}
-        <aside className="flex-none w-72 border-r border-gray-300 bg-white flex flex-col">
+        <aside className="flex-none w-72 border-r flex flex-col" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
           <div className="flex-none border-b border-gray-200 px-3 py-2.5">
             <div className="text-xs uppercase tracking-wider text-gray-500 font-medium mb-2">
               {tr('Product Library')}
@@ -5167,44 +7449,137 @@ export default function BoothSimulator() {
 
         {/* CENTER 3D CANVAS */}
         <main
-          className="flex-1 relative bg-gray-100"
+          className="flex-1 relative"
+          style={{ backgroundColor: '#dcdde0' }}
           onMouseDown={onCanvasMouseDown}
           onMouseMove={onCanvasMouseMove}
           onMouseUp={onCanvasMouseUp}
           onClick={onCanvasClick}
         >
           <div ref={mountRef} className="absolute inset-0" />
-          {/* overlay info */}
+          {/* booth size: click to open the booth settings */}
           <div
-            style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
-            className="absolute top-3 left-3 backdrop-blur border border-gray-200 rounded px-3 py-2 text-xs text-gray-700 leading-snug pointer-events-none"
+            className="absolute top-3 left-3 z-30"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="font-medium text-gray-900 mb-0.5">
-              {fromMM(booth.width, booth.unit)} ×{' '}
-              {fromMM(booth.depth, booth.unit)} {booth.unit}
-            </div>
-            <div className="text-gray-500">
-              {fromMM(booth.width, 'mm')} × {fromMM(booth.depth, 'mm')} mm ·{' '}
-              {tr('wall')} {fromMM(booth.wallHeight, booth.unit)}
-              {booth.unit}
-            </div>
+            <button
+              onClick={() => setOpenMenu(openMenu === 'booth' ? null : 'booth')}
+              className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-left text-xs leading-snug hover:border-gray-400 shadow-sm"
+            >
+              <div className="font-medium text-gray-900 flex items-center gap-1">
+                {fromMM(booth.width, booth.unit)} × {fromMM(booth.depth, booth.unit)} {booth.unit}
+                <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+              </div>
+              <div className="text-gray-500">
+                {tr(booth.style === 'curtain' ? 'Curtain Booth' : 'Wall Booth')} · {tr('wall')}{' '}
+                {fromMM(booth.wallHeight, booth.unit)}
+                {booth.unit}
+              </div>
+            </button>
+            {openMenu === 'booth' && (
+              <div className="mt-1.5 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3 space-y-3">
+                <div className="text-xs font-medium text-gray-900">{tr('Booth settings')}</div>
+                <div>
+                  <div className="text-[11px] text-gray-500 mb-1">{tr('Templates')}</div>
+                  <div className="flex gap-1">
+                    {['10x10', '10x20', '20x20'].map((t) => (
+                      <PresetBtn key={t} onClick={() => applyTemplate(t)}>
+                        {t.replace('x', '×')} ft
+                      </PresetBtn>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-gray-500 mb-1">{tr('Size')}</div>
+                  <div className="flex flex-col gap-1.5">
+                    <NumInput label={tr('Width')} valueMM={booth.width} unit={booth.unit} onChange={(mm) => setBooth({ ...booth, width: mm })} />
+                    <NumInput label={tr('Depth')} valueMM={booth.depth} unit={booth.unit} onChange={(mm) => setBooth({ ...booth, depth: mm })} />
+                    <NumInput label={tr('Wall H')} valueMM={booth.wallHeight} unit={booth.unit} onChange={(mm) => setBooth({ ...booth, wallHeight: mm })} />
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-gray-500 mb-1">{tr('Unit')}</div>
+                  <div className="flex gap-1">
+                    {['ft', 'm', 'cm', 'mm'].map((u) => (
+                      <button
+                        key={u}
+                        onClick={() => setBooth({ ...booth, unit: u })}
+                        className={
+                          'flex-1 text-xs py-1 rounded border ' +
+                          (booth.unit === u ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
+                        }
+                      >
+                        {u}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-gray-500 mb-1">{tr('Booth Type')}</div>
+                  <div className="flex gap-1">
+                    {[
+                      ['wall', 'Wall Booth', 'Solid panel walls'],
+                      ['curtain', 'Curtain Booth', 'Pole frame with fabric curtains'],
+                    ].map(([k, label, hint]) => (
+                      <button
+                        key={k}
+                        onClick={() => setBoothStyle(k)}
+                        title={tr(hint)}
+                        className={
+                          'flex-1 text-xs py-1 rounded border ' +
+                          (booth.style === k ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
+                        }
+                      >
+                        {tr(label)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <div
-            style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
-            className="absolute bottom-3 left-3 backdrop-blur border border-gray-200 rounded px-3 py-1.5 text-xs text-gray-600 pointer-events-none"
-          >
-            <span className="font-medium">{tr('L-Drag')}</span> {tr('rotate')}{' '}
-            · <span className="font-medium">{tr('R-Drag')}</span> {tr('pan')} ·{' '}
-            <span className="font-medium">{tr('Wheel')}</span> {tr('zoom')} ·{' '}
-            <span className="font-medium">{tr('Click')}</span> {tr('select')}
-          </div>
-          {/* brief "Saved ✓" confirmation (Ctrl+S or Save Design) */}
-          {saveStatus && (
-            <div className="absolute bottom-3 right-3 bg-green-600 text-white rounded px-3 py-1.5 text-xs font-medium shadow-md pointer-events-none flex items-center gap-1.5">
-              <Save className="w-3.5 h-3.5" />
-              {saveStatus}
+
+          {levelTip && (
+            <div
+              className="absolute z-20 pointer-events-none bg-gray-900 text-white text-xs font-medium rounded px-2 py-1 tabular-nums"
+              style={{ left: levelTip.x + 14, top: levelTip.y - 12 }}
+            >
+              {levelTip.text}
             </div>
           )}
+          {/* view toolbar: what you look at, and how */}
+          <div
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg p-1 shadow-sm whitespace-nowrap"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {[
+              ['3d', <Box key="i" className="w-3.5 h-3.5" />, '3D'],
+              ['top', <Grid3x3 key="i" className="w-3.5 h-3.5" />, 'Top'],
+              ['front', <Eye key="i" className="w-3.5 h-3.5" />, 'Front'],
+            ].map(([m, icon, label]) => (
+              <ToolBtn key={m} active={viewMode === m} onClick={() => setViewMode(m)}>
+                {icon} {tr(label)}
+              </ToolBtn>
+            ))}
+            <div className="w-px h-5 bg-gray-200 mx-1" />
+            {Object.entries(BOOTH_LOOKS).filter(([key]) => key !== 'studio').map(([key, lk]) => (
+              <ToolBtn key={key} active={(booth.look || DEFAULT_LOOK) === key} onClick={() => setBoothLook(key)} title={tr(lk.hint)}>
+                {tr(lk.label)}
+              </ToolBtn>
+            ))}
+            <div className="w-px h-5 bg-gray-200 mx-1" />
+            <ToolBtn active={showPeople} onClick={() => setShowPeople((v) => !v)} title={tr('Show people walking past the booth')}>
+              <Footprints className="w-3.5 h-3.5" /> {tr('Visitors')}
+            </ToolBtn>
+            <ToolBtn onClick={savePNG} title={tr('Save current view as PNG')}>
+              <Camera className="w-3.5 h-3.5" />
+            </ToolBtn>
+          </div>
+          <div className="absolute bottom-3 left-3 text-[11px] text-gray-500 pointer-events-none">
+            {tr('L-Drag')} {tr('rotate')} · {tr('R-Drag')} {tr('pan')} · {tr('Wheel')} {tr('zoom')}
+          </div>
           {Object.keys(warnings).length > 0 &&
             (() => {
               // group flagged items by reason for a clear breakdown
@@ -5270,113 +7645,10 @@ export default function BoothSimulator() {
             })()}
         </main>
 
-        {/* DESIGN LIBRARY DRAWER — fixed overlay so it shows regardless of
-            screen width (does not get pushed off-screen by other panels) */}
-        {showLibrary && (
-          <>
-            {/* click-away backdrop */}
-            <div
-              className="fixed inset-0 z-40"
-              style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}
-              onClick={() => setShowLibrary(false)}
-            />
-            <aside className="fixed top-0 right-0 z-50 h-full w-72 border-l border-gray-300 bg-white flex flex-col shadow-xl">
-              <div className="flex-none border-b border-gray-200 px-3 py-2.5 flex items-center justify-between">
-                <div className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-                  {tr('Design Library')}
-                </div>
-                <button
-                  onClick={() => setShowLibrary(false)}
-                  className="text-gray-400 hover:text-gray-700 text-xs"
-                  title={tr('Close')}
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex-none px-3 py-2 border-b border-gray-200">
-                <button
-                  onClick={() => saveDesign()}
-                  className="w-full inline-flex items-center justify-center gap-1.5 text-xs px-2 py-2 rounded bg-red-600 text-white hover:bg-red-700 transition font-medium"
-                >
-                  <Save className="w-3.5 h-3.5" /> {tr('Save Current Booth')}
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {savedDesigns.length === 0 ? (
-                  <div className="p-6 text-center text-gray-400 text-xs">
-                    {tr('No saved designs yet.')}
-                    <br />
-                    {tr('Click "Save Current Booth" to store this layout.')}
-                  </div>
-                ) : (
-                  <div className="py-1">
-                    {savedDesigns.map((d) => (
-                      <div
-                        key={d.id}
-                        className="group px-3 py-2 border-b border-gray-100 hover:bg-gray-50"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <button
-                            onClick={() => loadDesign(d)}
-                            className="flex-1 min-w-0 text-left"
-                            title={tr('Click to load this design')}
-                          >
-                            <div className="text-xs font-medium text-gray-900 truncate">
-                              {d.name}
-                            </div>
-                            <div className="text-xs text-gray-400 mt-0.5">
-                              {d.products ? d.products.length : 0}
-                              {tr(' items')} ·{' '}
-                              {new Date(d.savedAt).toLocaleDateString()}
-                            </div>
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <button
-                            onClick={() => loadDesign(d)}
-                            className="text-xs px-1.5 py-0.5 rounded border border-gray-300 hover:bg-white text-gray-700"
-                          >
-                            {tr('Load')}
-                          </button>
-                          <button
-                            onClick={() => renameDesign(d.id)}
-                            className="text-xs px-1.5 py-0.5 rounded border border-gray-300 hover:bg-white text-gray-700"
-                          >
-                            {tr('Rename')}
-                          </button>
-                          <button
-                            onClick={() => deleteDesign(d.id)}
-                            className="text-xs px-1.5 py-0.5 rounded border border-gray-300 hover:bg-red-50 hover:border-red-300 text-red-600"
-                          >
-                            {tr('Delete')}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex-none border-t border-gray-200 px-3 py-2 bg-gray-50">
-                <div className="text-xs text-gray-400 leading-snug">
-                  {tr('Designs are stored in this browser only.')}
-                </div>
-              </div>
-            </aside>
-          </>
-        )}
-
         {/* RIGHT PANEL */}
-        <aside className="flex-none w-80 border-l border-gray-300 bg-white flex flex-col">
+        <aside className="flex-none w-80 border-l flex flex-col" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
           {!selected ? (
-            <div className="flex-1 flex items-center justify-center p-6 text-center">
-              <div className="text-gray-400 text-sm">
-                <Box className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <div>{tr('Select a product to edit')}</div>
-                <div className="text-xs mt-1">
-                  {tr('or click a product in the library to add')}
-                </div>
-              </div>
-            </div>
+            <BoothOverview products={products} warnings={warnings} onSelect={setSelectedId} />
           ) : (
             <PropertyPanel
               product={selected}
@@ -5391,6 +7663,18 @@ export default function BoothSimulator() {
           )}
         </aside>
       </div>
+      {showCloud && (
+        <CloudLibrary
+          kind="booth"
+          title={tr('Booth layouts')}
+          getCurrent={currentWork}
+          onOpen={openWork}
+          currentId={cloudId}
+          setCurrentId={setCloudId}
+          onClose={() => setShowCloud(false)}
+          localImport={localImport}
+        />
+      )}
     </div>
   );
 }
@@ -5408,38 +7692,75 @@ function PropertyPanel({
   del,
   boothSize,
 }) {
+  // which tabs this product has: basic is always there
+  const [tab, setTab] = useState('basic');
   if (!tpl) return null;
+  const isHH = isLevelProduct(tpl);
+  const tabs = [['basic', 'Basic']];
+  if (isHH && HH_LEVEL_TYPES.includes(tpl.type)) tabs.push(['levels', 'Levels']);
+  if (isHH && HH_ITEM_TYPES.includes(tpl.type)) tabs.push(['items', 'Display']);
+  const current = tabs.some(([k]) => k === tab) ? tab : 'basic';
+  const iconBtn = 'p-1.5 rounded text-gray-500 hover:bg-white hover:text-gray-900';
   const xMin = (-boothSize.w * MM_TO_M) / 2;
   const xMax = (boothSize.w * MM_TO_M) / 2;
   const zMin = (-boothSize.d * MM_TO_M) / 2;
   const zMax = (boothSize.d * MM_TO_M) / 2;
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      {/* header */}
-      <div className="px-4 py-3 border-b border-gray-200">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-              {tpl.brand}
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* name, with the actions you reach for most */}
+      <div className="flex-none px-4 pt-3 pb-2">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] text-gray-500 truncate">
+              {tpl.brand === 'HOMEDANT HOUSE' ? 'HOMEDANT HOUSE' : tr(tpl.category)}
             </div>
-            <div className="font-semibold text-sm leading-tight mt-0.5 truncate">
-              {tr(product.name)}
-            </div>
-            <div className="text-xs text-gray-500 mt-0.5">{tr(tpl.category)}</div>
+            <div className="font-semibold text-sm leading-tight mt-0.5 truncate">{tr(product.name)}</div>
           </div>
-          {warning && (
-            <span
-              className="flex-none inline-flex items-center gap-1 text-xs px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-medium"
-              title={warningReasonLabel(warning)}
-            >
-              <AlertTriangle className="w-3 h-3" />
-              {tr(WARNING_REASON_SHORT[warning] || 'Review')}
-            </span>
-          )}
+          <button onClick={rotate} title={tr('Rotate') + ' 90°'} className={iconBtn}>
+            <RotateCw className="w-4 h-4" />
+          </button>
+          <button onClick={duplicate} title={tr('Duplicate')} className={iconBtn}>
+            <Copy className="w-4 h-4" />
+          </button>
+          <button onClick={del} title={tr('Delete')} className="p-1.5 rounded text-gray-500 hover:bg-red-50 hover:text-red-600">
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
+        {warning && (
+          <div className="mt-2">
+      
+        <span
+          className="flex-none inline-flex items-center gap-1 text-xs px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-medium"
+          title={warningReasonLabel(warning)}
+        >
+          <AlertTriangle className="w-3 h-3" />
+          {tr(WARNING_REASON_SHORT[warning] || 'Review')}
+        </span>
+          </div>
+        )}
       </div>
 
+      {tabs.length > 1 && (
+        <div className="flex-none flex gap-1 px-4 pb-2 border-b" style={{ borderColor: UI_LINE }}>
+          {tabs.map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={
+                'flex-1 text-xs py-1.5 rounded transition ' +
+                (current === k ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-white')
+              }
+            >
+              {tr(label)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto">
+        {current === 'basic' && (
+          <>
       {/* dimensions */}
       <Section title={tr('Dimensions')}>
         <SizeSelect
@@ -5458,7 +7779,7 @@ function PropertyPanel({
           label={tr('Height')}
           value={product.height}
           options={tpl.sizeOptions.height}
-          onChange={(v) => update({ height: v })}
+          onChange={(v) => update({ height: v, tier: fitTier(tpl, { ...product, height: v }) })}
         />
         {tpl.tierOptions.length > 1 && (
           <Field label={tr('Tier')}>
@@ -5467,7 +7788,7 @@ function PropertyPanel({
               onChange={(e) => update({ tier: parseInt(e.target.value, 10) })}
               className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"
             >
-              {tpl.tierOptions.map((t) => (
+              {tierChoices(tpl, product).map((t) => (
                 <option key={t} value={t}>
                   {tpl.type === 'open_base' ? t - 1 : t}
                   {tr('-Tier')}
@@ -5476,7 +7797,7 @@ function PropertyPanel({
             </select>
           </Field>
         )}
-        {tpl.brand === 'HOMEDANT HOUSE' && tpl.type === 'garment' && product.tier >= 3 && (
+        {isLevelProduct(tpl) && tpl.type === 'garment' && product.tier >= 3 && (
           <Field label={tr('Hanger bars')}>
             <div className="flex gap-1.5">
               {[1, 2].map((n) => (
@@ -5497,7 +7818,10 @@ function PropertyPanel({
         )}
       </Section>
 
+      {tpl.type === 'staff' && <StaffEditor product={product} update={update} fixed={!!tpl.preset} />}
+
       {/* colors */}
+      {tpl.type !== 'staff' && (
       <Section title={tr('Colors')}>
         <Field label={tr('Frame')}>
           <div className="flex gap-1.5">
@@ -5560,17 +7884,43 @@ function PropertyPanel({
           </Field>
         )}
       </Section>
-
-      {tpl.brand === 'HOMEDANT HOUSE' && HH_ITEM_TYPES.includes(tpl.type) && (
-        <HHItemEditor product={product} tpl={tpl} update={update} />
       )}
 
-      {tpl.brand === 'HOMEDANT HOUSE' && HH_LEVEL_TYPES.includes(tpl.type) && (
-        <HHLevelEditor product={product} tpl={tpl} update={update} />
+      {/* add-ons */}
+      {tpl.addOns.length > 0 && (
+        <Section title={tr('Add-on Options')}>
+          <div className="grid grid-cols-2 gap-1">
+            {tpl.addOns.map((a) => {
+              const active = (product.addOns || []).includes(a);
+              return (
+                <button
+                  key={a}
+                  onClick={() => {
+                    const cur = product.addOns || [];
+                    update({
+                      addOns: active ? cur.filter((x) => x !== a) : [...cur, a],
+                    });
+                  }}
+                  className={`text-xs py-1 px-1.5 rounded border transition truncate ${
+                    active
+                      ? 'border-red-500 bg-red-50 text-red-700'
+                      : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {tr(a)}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
       )}
 
-      {/* position */}
-      <Section title={tr('Position & Rotation')}>
+
+            <details className="border-b border-gray-200">
+              <summary className="px-4 py-2.5 text-xs text-gray-500 cursor-pointer select-none">
+                {tr('Enter position')}
+              </summary>
+          <div className="px-4 pb-3">
         <Field label={tr('X (m)')}>
           <input
             type="number"
@@ -5622,60 +7972,30 @@ function PropertyPanel({
             </button>
           </div>
         </Field>
-      </Section>
-
-      {/* add-ons */}
-      {tpl.addOns.length > 0 && (
-        <Section title={tr('Add-on Options')}>
-          <div className="grid grid-cols-2 gap-1">
-            {tpl.addOns.map((a) => {
-              const active = (product.addOns || []).includes(a);
-              return (
-                <button
-                  key={a}
-                  onClick={() => {
-                    const cur = product.addOns || [];
-                    update({
-                      addOns: active ? cur.filter((x) => x !== a) : [...cur, a],
-                    });
-                  }}
-                  className={`text-xs py-1 px-1.5 rounded border transition truncate ${
-                    active
-                      ? 'border-red-500 bg-red-50 text-red-700'
-                      : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {tr(a)}
-                </button>
-              );
-            })}
           </div>
-        </Section>
+
+
+            </details>
+          </>
+        )}
+        {current === 'levels' && (
+          <>
+      {isLevelProduct(tpl) && HH_LEVEL_TYPES.includes(tpl.type) && (
+        <HHLevelEditor product={product} tpl={tpl} update={update} />
       )}
 
-      {/* size summary */}
-      <Section title={tr('Summary')}>
-        <div className="grid grid-cols-3 gap-2 text-xs">
-          <SumCell label={tr('W')} mm={product.width} />
-          <SumCell label={tr('D')} mm={product.depth} />
-          <SumCell label={tr('H')} mm={product.height} />
-        </div>
-      </Section>
 
-      {/* actions */}
-      <div className="px-4 py-3 border-t border-gray-200 flex gap-2 sticky bottom-0 bg-white">
-        <button
-          onClick={duplicate}
-          className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5 border border-gray-300 rounded hover:bg-gray-50"
-        >
-          <Copy className="w-3.5 h-3.5" /> {tr('Duplicate')}
-        </button>
-        <button
-          onClick={del}
-          className="flex-1 inline-flex items-center justify-center gap-1 text-xs px-2 py-1.5 border border-red-300 text-red-700 rounded hover:bg-red-50"
-        >
-          <Trash2 className="w-3.5 h-3.5" /> {tr('Delete')}
-        </button>
+          </>
+        )}
+        {current === 'items' && (
+          <>
+      {isLevelProduct(tpl) && HH_ITEM_TYPES.includes(tpl.type) && (
+        <HHItemEditor product={product} tpl={tpl} update={update} />
+      )}
+
+
+          </>
+        )}
       </div>
     </div>
   );
@@ -5705,6 +8025,247 @@ function NumInput({ label, valueMM, unit, onChange }) {
         className="w-16 text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
       />
     </label>
+  );
+}
+
+const BUYER_TEMPLATES = PRODUCT_LIBRARY.filter(
+  (t) => t.brand === 'HOMEDANT HOUSE' && t.type !== 'cabinet'
+);
+// a fresh product for the buyer view; keeps the colours already chosen
+function newBuyerProduct(tpl, keep) {
+  const boards = tpl.boardColors;
+  return {
+    instanceId: 'b0',
+    productId: tpl.id,
+    name: tpl.name,
+    width: tpl.defaultSize.width,
+    depth: tpl.defaultSize.depth,
+    height: tpl.defaultSize.height,
+    // an ordinary shelf is shown at 4 levels, like the usual buyer photos
+    tier: tpl.type === 'shelf' && tpl.tierOptions.includes(4) ? 4 : tpl.defaultTier,
+    frameColor: keep ? keep.frameColor : 'white',
+    boardColor: keep && boards.includes(keep.boardColor) ? keep.boardColor : tpl.boardColors[0],
+    shelfStyle: keep ? keep.shelfStyle : undefined,
+    position: { x: 0, z: 0 },
+    rotation: 0,
+    addOns: [],
+  };
+}
+
+function BuyerPanel({ base, tpl, setBase, compare, setCompare }) {
+  if (!tpl) return null;
+  const hex = '#' + frameHexOf(base.frameColor).toString(16).padStart(6, '0');
+  const btn = (on) =>
+    'flex-1 text-xs py-1.5 rounded border transition ' +
+    (on ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50');
+  const swatch = ([k, name, h]) => (
+    <button
+      key={k}
+      onClick={() => setBase({ frameColor: k })}
+      title={tr(name)}
+      className={'flex flex-col items-center gap-1 p-1 rounded ' + (base.frameColor === k ? 'bg-white ring-2 ring-gray-900' : 'hover:bg-white')}
+    >
+      <span
+        className="w-9 h-9 rounded-full border border-gray-300"
+        style={{ backgroundColor: '#' + h.toString(16).padStart(6, '0') }}
+      />
+      <span className="text-[11px] text-gray-700 leading-tight text-center">{tr(name)}</span>
+    </button>
+  );
+  const inCompare = compare.includes(base.frameColor);
+  return (
+    <div>
+      <div className="px-4 pt-3 pb-2">
+        <div className="text-[11px] text-gray-500">HOMEDANT HOUSE</div>
+        <div className="font-semibold text-sm">{tr(base.name)}</div>
+      </div>
+      <Section title={tr('Size')}>
+        <SizeSelect label={tr('Width')} value={base.width} options={tpl.sizeOptions.width} onChange={(v) => setBase({ width: v })} />
+        <SizeSelect label={tr('Depth')} value={base.depth} options={tpl.sizeOptions.depth} onChange={(v) => setBase({ depth: v })} />
+        <SizeSelect
+          label={tr('Height')}
+          value={base.height}
+          options={tpl.sizeOptions.height}
+          onChange={(v) => setBase({ height: v, tier: fitTier(tpl, { ...base, height: v }) })}
+        />
+        <div className="text-[11px] text-gray-500 -mt-1 mb-2 leading-snug">
+          {tr('Outer size')}: {hhOuterLabel(base).mm}
+          <br />
+          <span className="text-gray-400">{hhOuterLabel(base).inch}</span>
+        </div>
+        {tpl.tierOptions.length > 1 && (
+          <Field label={tr('Tiers')}>
+            <div className="flex gap-1">
+              {tierChoices(tpl, base).map((t) => (
+                <button key={t} onClick={() => setBase({ tier: t })} className={btn(base.tier === t)}>
+                  {tpl.type === 'open_base' ? t - 1 : t}
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
+      </Section>
+      <Section title={tr('Frame color')}>
+        <div className="text-[11px] text-gray-500 mb-1">{tr('Standard')}</div>
+        <div className="grid grid-cols-4 gap-1 mb-2">{SHELF_COLORS.filter((c) => c[3] === 'standard').map(swatch)}</div>
+        <div className="text-[11px] text-gray-500 mb-1">{tr('New color proposals')}</div>
+        <div className="grid grid-cols-4 gap-1 mb-2">{SHELF_COLORS.filter((c) => c[3] === 'new').map(swatch)}</div>
+        <div className="text-[11px] text-gray-500 mb-1">{tr('Custom color')}</div>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={hex}
+            onChange={(e) => setBase({ frameColor: e.target.value.toLowerCase() })}
+            className="w-9 h-8 p-0 border border-gray-300 rounded bg-white cursor-pointer"
+          />
+          <input
+            type="text"
+            value={hex.toUpperCase()}
+            onChange={(e) => {
+              const v = e.target.value.trim();
+              if (/^#[0-9a-f]{6}$/i.test(v)) setBase({ frameColor: v.toLowerCase() });
+            }}
+            className="flex-1 text-xs border border-gray-300 rounded px-2 py-1.5 bg-white font-mono"
+          />
+        </div>
+        <div className="text-xs text-gray-700 mt-2">
+          {tr('Selected')}: <span className="font-medium">{colorLabel(base.frameColor)}</span>
+        </div>
+      </Section>
+      <Section title={tr('Plywood board')}>
+        <div className="flex gap-1.5">
+          {tpl.boardColors.map((b) => (
+            <button key={b} onClick={() => setBase({ boardColor: b })} className={btn(base.boardColor === b)}>
+              {tr(b === 'wood' ? 'Wood face up' : 'White face up')}
+            </button>
+          ))}
+        </div>
+        {HH_LEVEL_TYPES.includes(tpl.type) && (
+          <div className="flex gap-1.5 mt-2">
+            {['basic', 'basket'].map((st) => (
+              <button key={st} onClick={() => setBase({ shelfStyle: st })} className={btn((base.shelfStyle || 'basic') === st)}>
+                {st}
+              </button>
+            ))}
+          </div>
+        )}
+      </Section>
+      <Section title={tr('Compare colors')}>
+        <div className="text-xs text-gray-500 mb-2">{tr('Add 2 to 4 colors to see them side by side.')}</div>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {compare.map((c) => (
+            <span key={c} className="inline-flex items-center gap-1.5 text-xs bg-white border border-gray-300 rounded-full pl-1 pr-2 py-0.5">
+              <span className="w-4 h-4 rounded-full border border-gray-300" style={{ backgroundColor: '#' + frameHexOf(c).toString(16).padStart(6, '0') }} />
+              {colorLabel(c)}
+              <button onClick={() => setCompare(compare.filter((x) => x !== c))} className="text-gray-400 hover:text-gray-900">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => !inCompare && compare.length < 4 && setCompare([...compare, base.frameColor])}
+            className={btn(false) + (inCompare || compare.length >= 4 ? ' opacity-50 cursor-default' : '')}
+          >
+            {tr('Add selected color')}
+          </button>
+          {compare.length > 0 && (
+            <button onClick={() => setCompare([])} className={btn(false)}>
+              {tr('Clear')}
+            </button>
+          )}
+        </div>
+      </Section>
+      <div className="px-4 py-3 text-[11px] text-gray-500 leading-relaxed">
+        {tr('Colors on screen are approximate. Final colors are confirmed with a physical sample.')}
+      </div>
+    </div>
+  );
+}
+
+/* Right panel when nothing is selected: what is in the booth, and any
+   placement reminders. Click a line to select that product.           */
+function BoothOverview({ products, warnings, onSelect }) {
+  const nWarn = Object.keys(warnings).length;
+  return (
+    <div className="flex-1 overflow-y-auto p-4">
+      <div className="text-sm font-semibold text-gray-900 mb-1">{tr('In this booth')}</div>
+      <div className="text-xs text-gray-500 mb-3">
+        {products.length
+          ? tr('Click a product here or in the 3D view to edit it.')
+          : tr('Add products from the list on the left.')}
+      </div>
+      {products.map((p) => (
+        <button
+          key={p.instanceId}
+          onClick={() => onSelect(p.instanceId)}
+          className="w-full flex items-center gap-2 text-left text-xs px-2.5 py-2 mb-1 rounded bg-white border border-gray-200 hover:border-gray-400"
+        >
+          <span className="flex-1 truncate text-gray-800">{tr(p.name)}</span>
+          <span className="text-gray-400 tabular-nums">
+            {p.width}×{p.depth}×{p.height}
+          </span>
+          {warnings[p.instanceId] && <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-none" />}
+        </button>
+      ))}
+      {nWarn > 0 && (
+        <div className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2.5 py-2">
+          {tr('Layout Check')}: {nWarn}
+          {tr(nWarn > 1 ? ' items need attention' : ' item needs attention')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuButton({ open, onToggle, icon, label, iconOnly, children }) {
+  return (
+    <div className="relative">
+      <button
+        onClick={onToggle}
+        title={iconOnly ? label : undefined}
+        className={
+          'inline-flex items-center gap-1 text-xs rounded border transition ' +
+          (iconOnly ? 'p-1.5 ' : 'px-2.5 py-1.5 ') +
+          (open ? 'bg-white border-gray-400 text-gray-900' : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400')
+        }
+      >
+        {icon}
+        {!iconOnly && (
+          <>
+            {label}
+            <ChevronDown className="w-3 h-3 text-gray-500" />
+          </>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 min-w-[200px] bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-40">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+function MenuItem({ onClick, children }) {
+  return (
+    <button onClick={onClick} className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 text-left whitespace-nowrap">
+      {children}
+    </button>
+  );
+}
+function ToolBtn({ active, onClick, title, children }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={
+        'inline-flex items-center gap-1 text-xs px-2 py-1 rounded transition ' +
+        (active ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-100')
+      }
+    >
+      {children}
+    </button>
   );
 }
 
@@ -5873,6 +8434,19 @@ function HHItemEditor({ product, tpl, update }) {
 /* Per-level controls for HOMEDANT HOUSE shelves: drag a slider to move a
    level up or down (it snaps to the post slots) and switch that level
    between basic and basket. Listed top level first, like the shelf.   */
+/* Move level i to about `raw` mm: snapped to the slot pitch and kept
+   between its neighbours. Returns the new list, or null if unchanged. */
+function hhMoveLevel(product, levels, i, raw) {
+  const R = levelRule(product);
+  const min = i === 0 ? R.min : levels[i - 1].h + R.gap;
+  const max = i === levels.length - 1 ? product.height : levels[i + 1].h - R.gap;
+  let v = R.min + Math.round((raw - R.min) / R.step) * R.step;
+  if (raw >= max - R.step / 2) v = max; // let a level reach its top stop
+  v = Math.max(min, Math.min(max, v));
+  if (v === levels[i].h) return null;
+  return levels.map((l, k) => (k === i ? { ...l, h: v } : l));
+}
+
 function HHLevelEditor({ product, tpl, update }) {
   const tiers = product.tier || tpl.defaultTier;
   const levels = hhResolveLevels(product, tiers);
@@ -5881,16 +8455,8 @@ function HHLevelEditor({ product, tpl, update }) {
   const commit = (next) =>
     update({ levels: next, levelsKey: hhLevelKey(product) });
   const setHeight = (i, raw) => {
-    const min = i === 0 ? HH_LEVEL_MIN : levels[i - 1].h + HH_LEVEL_GAP;
-    const max =
-      i === levels.length - 1 ? product.height : levels[i + 1].h - HH_LEVEL_GAP;
-    let v =
-      HH_LEVEL_MIN +
-      Math.round((raw - HH_LEVEL_MIN) / HH_LEVEL_STEP) * HH_LEVEL_STEP;
-    if (raw >= max - HH_LEVEL_STEP / 2) v = max; // let a level reach its top stop
-    v = Math.max(min, Math.min(max, v));
-    if (v === levels[i].h) return;
-    commit(levels.map((l, k) => (k === i ? { ...l, h: v } : l)));
+    const next = hhMoveLevel(product, levels, i, raw);
+    if (next) commit(next);
   };
   const toggle = (i) =>
     commit(
@@ -5899,10 +8465,12 @@ function HHLevelEditor({ product, tpl, update }) {
       )
     );
   const rows = [];
+  const R = levelRule(product);
+  const styled = specOfProduct(product) === HH; // basic / basket is HOMEDANT HOUSE only
   for (let i = levels.length - 1; i >= first; i--) {
-    const min = i === 0 ? HH_LEVEL_MIN : levels[i - 1].h + HH_LEVEL_GAP;
+    const min = i === 0 ? R.min : levels[i - 1].h + R.gap;
     const max =
-      i === levels.length - 1 ? product.height : levels[i + 1].h - HH_LEVEL_GAP;
+      i === levels.length - 1 ? product.height : levels[i + 1].h - R.gap;
     rows.push(
       <div key={i} className="flex items-center gap-2 mb-2">
         <span className="flex-none w-4 text-xs text-gray-500">{i + 1 - first}</span>
@@ -5919,7 +8487,7 @@ function HHLevelEditor({ product, tpl, update }) {
         <span className="flex-none w-14 text-right text-xs text-gray-700 tabular-nums">
           {levels[i].h} mm
         </span>
-        <button
+        {styled && <button
           onClick={() => toggle(i)}
           className={`flex-none w-14 text-xs py-1 rounded border transition ${
             levels[i].style === 'basket'
@@ -5929,7 +8497,7 @@ function HHLevelEditor({ product, tpl, update }) {
           title={tr('Switch this level between basic and basket')}
         >
           {tr(levels[i].style)}
-        </button>
+        </button>}
       </div>
     );
   }
@@ -5939,6 +8507,9 @@ function HHLevelEditor({ product, tpl, update }) {
         {tr(
           'Height from the post bottom to the top of each level. Level 1 is the lowest.'
         )}
+      </div>
+      <div className="text-xs text-gray-500 mb-2">
+        {tr('Tip: drag a board of the selected shelf up or down in the 3D view.')}
       </div>
       {rows}
       <button
@@ -5952,6 +8523,64 @@ function HHLevelEditor({ product, tpl, update }) {
       >
         {tr('Reset to even spacing')}
       </button>
+    </Section>
+  );
+}
+
+function StaffEditor({ product, update, fixed }) {
+  const btn = (on) =>
+    `flex-1 text-xs py-1.5 rounded border transition ${
+      on ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+    }`;
+  return (
+    <Section title={tr('Staff')}>
+      <Field label={tr('Name tag')}>
+        <input
+          type="text"
+          value={product.staffName ?? (fixed ? '이과장' : '')}
+          maxLength={12}
+          onChange={(e) => update({ staffName: e.target.value })}
+          className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+        />
+      </Field>
+      <Field label={tr('Speech bubble')}>
+        <input
+          type="text"
+          value={product.staffSay ?? 'Hi, how are you?'}
+          maxLength={40}
+          onChange={(e) => update({ staffSay: e.target.value })}
+          className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"
+        />
+      </Field>
+      {!fixed && (<>
+      <Field label={tr('Glasses')}>
+        <div className="flex gap-1.5">
+          {[false, true].map((on) => (
+            <button key={String(on)} onClick={() => update({ staffGlasses: on })} className={btn(!!product.staffGlasses === on)}>
+              {tr(on ? 'on' : 'off')}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label={tr('Hair')}>
+        <div className="flex gap-1.5">
+          {['short', 'parted'].map((v) => (
+            <button key={v} onClick={() => update({ staffHair: v })} className={btn((product.staffHair || 'short') === v)}>
+              {tr(v)}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label={tr('Shirt')}>
+        <div className="flex gap-1.5 flex-wrap">
+          {Object.keys(STAFF_SHIRTS).map((v) => (
+            <button key={v} onClick={() => update({ staffShirt: v })} className={btn((product.staffShirt || 'navy') === v)}>
+              {tr(v)}
+            </button>
+          ))}
+        </div>
+      </Field>
+      </>)}
     </Section>
   );
 }
@@ -6079,6 +8708,27 @@ function ProductThumb({ type, tpl, product }) {
         <line x1="5" y1="11" x2="19" y2="11" />
         <circle cx="8" cy="21" r="1.3" />
         <circle cx="16" cy="21" r="1.3" />
+      </svg>
+    );
+  }
+  if (type === 'staff') {
+    return (
+      <svg viewBox="0 0 24 24" className={common} fill="none" stroke={stroke} strokeWidth="1.4">
+        <circle cx="12" cy="6" r="3.2" />
+        <path d="M6 21v-6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v6" />
+        <rect x="10.5" y="14" width="3" height="2" />
+      </svg>
+    );
+  }
+  if (type === 'trolley') {
+    return (
+      <svg viewBox="0 0 24 24" className={common} fill="none" stroke={stroke} strokeWidth="1.4">
+        <rect x="5" y="4" width="14" height="15" rx="0.5" />
+        <line x1="5" y1="9" x2="19" y2="9" />
+        <line x1="5" y1="14" x2="19" y2="14" />
+        <path d="M19 4h2.5" />
+        <circle cx="7.5" cy="21" r="1.3" />
+        <circle cx="16.5" cy="21" r="1.3" />
       </svg>
     );
   }
@@ -6249,9 +8899,11 @@ function createOrbitControls(camera, dom) {
       camera.position.copy(target).add(off);
       camera.lookAt(target);
     },
-    setView(mode, dist) {
+    setView(mode, dist, angles) {
       const r = dist || spherical.radius;
-      if (mode === 'top') {
+      if (angles) {
+        spherical.set(r, angles.phi, angles.theta);
+      } else if (mode === 'top') {
         spherical.set(r, 0.05, 0);
       } else if (mode === 'front') {
         spherical.set(r, Math.PI / 2 - 0.1, 0);
