@@ -1757,10 +1757,13 @@ function hhLevelKey(p) {
      foot 39.6 mm, 20 mm tall. homedant.com lists the SS shelves 12 mm
      wider and deeper than the size name, 11 mm taller (posts stand
      above the top board), with 0.36" (9 mm) boards.
-   - MAX 200: C-channel post 42.1 x 45.3 mm, open toward the inside,
-     slots 11.3 x 15.4 mm every 30 mm on its front and back faces; 87 mm
-     C-beams front and back at the top and bottom levels, steel trays with
-     folded edges in between; square plastic foot 51 x 56 mm.          */
+   - MAX 200: C-channel post, 45.3 mm across the front, 42.1 mm deep.
+     The front (and back) face is plain; the slot rows (11.3 x 15.4 mm
+     every 30 mm) are on the two side faces, and the open side with its
+     lips faces the post behind it. 87 mm C-beams run across the front
+     and back at the top and bottom levels, covering the post faces; the
+     levels in between are steel trays hooked into the side slots.
+     Square plastic foot 56 x 51 mm.                                    */
 const SP_SPEC = {
   kind: 'sp',
   flange: 0.0336,
@@ -1777,8 +1780,9 @@ const SP_SPEC = {
 };
 const LR_SPEC = {
   kind: 'lr',
-  postW: 0.0421,
-  postD: 0.0453,
+  postW: 0.0453, // across the front
+  postD: 0.0421, // front to back
+  beamD: 0.0104, // the front / back beams stand this far in front of the posts
   sheet: 0.0012,
   beamH: 0.087,
   trayLip: 0.035,
@@ -2028,22 +2032,28 @@ function addSPPosts(group, w, d, h, frameMat) {
     hhAdd(group, capZ, capMat, ex - sx * (CT / 2), h - CAP_H / 2, ez - sz * (CT + (F - CT) / 2));
   });
 }
-// MAX 200: C-channel, closed on the outside, open toward the shelf
+// MAX 200: C-channel with a plain front face, slotted side faces and the
+// open side facing the post behind it. The posts sit behind the beams.
 function addLRPosts(group, w, d, h, frameMat) {
-  const { postW: PW, postD: PD, sheet: t } = LR_SPEC;
-  const faceMat = slottedFaceMat(frameMat, 'lr', false, h);
-  const face = new THREE.PlaneGeometry(PW, h);
-  const outer = new THREE.BoxGeometry(t, h, PD);
+  const { postW: PW, postD: PD, sheet: t, beamD: D } = LR_SPEC;
+  const sideMat = slottedFaceMat(frameMat, 'lr', false, h);
+  const front = new THREE.BoxGeometry(PW, h, t);
+  const side = new THREE.PlaneGeometry(PD, h);
   const lipW = 0.008;
-  const lip = new THREE.BoxGeometry(t, h, lipW);
+  const lip = new THREE.BoxGeometry(lipW, h, t);
   CORNERS.forEach(([sx, sz]) => {
     const ex = sx * (w / 2),
-      ez = sz * (d / 2);
-    hhAdd(group, outer, frameMat, ex - sx * (t / 2), h / 2, ez - sz * (PD / 2));
-    hhAdd(group, face, faceMat, ex - sx * (PW / 2), h / 2, ez - sz * 0.0006);
-    hhAdd(group, face, faceMat, ex - sx * (PW / 2), h / 2, ez - sz * (PD - 0.0006));
-    hhAdd(group, lip, frameMat, ex - sx * (PW - t / 2), h / 2, ez - sz * (lipW / 2 + 0.0006));
-    hhAdd(group, lip, frameMat, ex - sx * (PW - t / 2), h / 2, ez - sz * (PD - lipW / 2 - 0.0006));
+      ez = sz * (d / 2 - D);
+    // plain front (or back) face
+    hhAdd(group, front, frameMat, ex - sx * (PW / 2), h / 2, ez - sz * (t / 2));
+    // slotted side faces, outer and inner
+    [0.0006, PW - 0.0006].forEach((off) => {
+      const m = hhAdd(group, side, sideMat, ex - sx * off, h / 2, ez - sz * (PD / 2));
+      m.rotation.y = -Math.PI / 2;
+    });
+    // lips on the open side, folded in toward each other
+    hhAdd(group, lip, frameMat, ex - sx * (lipW / 2 + 0.0006), h / 2, ez - sz * (PD - t / 2));
+    hhAdd(group, lip, frameMat, ex - sx * (PW - lipW / 2 - 0.0006), h / 2, ez - sz * (PD - t / 2));
   });
 }
 function plasticOf(frameMat) {
@@ -2073,17 +2083,17 @@ function addSPFeet(group, w, d, frameMat) {
 // MAX 200 foot: a square plastic cap the post stands in
 function addLRFeet(group, w, d, frameMat) {
   const m = plasticOf(frameMat);
-  const { postW: PW, postD: PD } = LR_SPEC;
-  const g = new THREE.BoxGeometry(PW + 0.009, 0.024, PD + 0.011);
+  const { postW: PW, postD: PD, beamD: D } = LR_SPEC;
+  const g = new THREE.BoxGeometry(PW + 0.011, 0.024, PD + 0.009);
   CORNERS.forEach(([sx, sz]) => {
-    hhAdd(group, g, m, sx * (w / 2 - PW / 2), 0.012, sz * (d / 2 - PD / 2));
+    hhAdd(group, g, m, sx * (w / 2 - PW / 2), 0.012, sz * (d / 2 - D - PD / 2));
   });
 }
 /* MAX 200 level. Top and bottom levels: 87 mm C-beams front and back
    with a steel deck between them. Levels in between: a steel tray with
    its front and back edges folded down, on depth supports at the sides. */
 function addLRLevel(group, w, d, yBoard, frameMat, thickness) {
-  const { postW: PW, sheet: t, beamH: BH, trayLip: TL } = LR_SPEC;
+  const { postW: PW, sheet: t, beamH: BH, trayLip: TL, beamD: D } = LR_SPEC;
   const cur = frameMat.userData.hh.cur || { i: 0, n: 1 };
   const top = yBoard + thickness / 2;
   const wi = w - 2 * PW; // between the posts
@@ -2094,23 +2104,25 @@ function addLRLevel(group, w, d, yBoard, frameMat, thickness) {
   const deckMat = [frameMat, frameMat, deckTop, frameMat, frameMat, frameMat];
   const isEnd = cur.i === 0 || cur.i === cur.n - 1;
   if (isEnd) {
-    const D = 0.0104; // beam depth
+    // C-beam across the full width, in front of the post faces
     [-1, 1].forEach((s) => {
       const z = s * (d / 2);
-      hhAdd(group, new THREE.BoxGeometry(wi, BH, t), frameMat, 0, top - BH / 2, z - s * (t / 2));
-      hhAdd(group, new THREE.BoxGeometry(wi, t, D), frameMat, 0, top - t / 2, z - s * (D / 2));
-      hhAdd(group, new THREE.BoxGeometry(wi, t, D), frameMat, 0, top - BH + t / 2, z - s * (D / 2));
-      hhAdd(group, new THREE.BoxGeometry(wi, 0.006, t), frameMat, 0, top - BH + 0.004, z - s * (D - t / 2));
+      hhAdd(group, new THREE.BoxGeometry(w - 0.002, BH, t), frameMat, 0, top - BH / 2, z - s * (t / 2));
+      hhAdd(group, new THREE.BoxGeometry(w - 0.002, t, D), frameMat, 0, top - t / 2, z - s * (D / 2));
+      hhAdd(group, new THREE.BoxGeometry(w - 0.002, t, D), frameMat, 0, top - BH + t / 2, z - s * (D / 2));
+      hhAdd(group, new THREE.BoxGeometry(w - 0.002, 0.006, t), frameMat, 0, top - BH + 0.004, z - s * (D - t / 2));
     });
     hhAdd(group, new THREE.BoxGeometry(wi - 0.002, 0.0015, d - 2 * D), deckMat, 0, top - 0.00075, 0);
   } else {
-    hhAdd(group, new THREE.BoxGeometry(wi - 0.002, 0.0015, d - 0.003), deckMat, 0, top - 0.00075, 0);
+    // tray between the posts, hooked into their side slots
+    const dz = d - 2 * D - 0.004;
+    hhAdd(group, new THREE.BoxGeometry(wi - 0.002, 0.0015, dz), deckMat, 0, top - 0.00075, 0);
     [-1, 1].forEach((s) => {
-      hhAdd(group, new THREE.BoxGeometry(wi - 0.002, TL, t), frameMat, 0, top - TL / 2, s * (d / 2 - 0.0015 - t / 2));
-      hhAdd(group, new THREE.BoxGeometry(wi - 0.002, t, 0.008), frameMat, 0, top - TL + t / 2, s * (d / 2 - 0.0055));
+      hhAdd(group, new THREE.BoxGeometry(wi - 0.002, TL, t), frameMat, 0, top - TL / 2, s * (dz / 2 - t / 2));
+      hhAdd(group, new THREE.BoxGeometry(wi - 0.002, t, 0.008), frameMat, 0, top - TL + t / 2, s * (dz / 2 - 0.004));
       // depth support under the tray at each side
-      hhAdd(group, new THREE.BoxGeometry(t, 0.025, d - 0.01), frameMat, s * (wi / 2 - 0.0015), top - 0.0015 - 0.0125, 0);
-      hhAdd(group, new THREE.BoxGeometry(0.02, t, d - 0.01), frameMat, s * (wi / 2 - 0.011), top - 0.0015 - 0.025, 0);
+      hhAdd(group, new THREE.BoxGeometry(t, 0.025, dz - 0.006), frameMat, s * (wi / 2 - 0.0015), top - 0.0015 - 0.0125, 0);
+      hhAdd(group, new THREE.BoxGeometry(0.02, t, dz - 0.006), frameMat, s * (wi / 2 - 0.011), top - 0.0015 - 0.025, 0);
     });
   }
 }
