@@ -26,6 +26,7 @@ import {
   FolderOpen,
   Footprints,
   Check,
+  Pencil,
 } from 'lucide-react';
 
 /* ============================================================
@@ -41,7 +42,7 @@ const SPEEDRACK_SIZES = {
 
 const HOMEDANT_HOUSE_SIZES = {
   width: [300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200],
-  depth: [300, 400, 500, 600, 700],
+  depth: [300, 400, 450, 500, 600, 700],
   height: [600, 750, 900, 1050, 1200, 1350, 1500, 1650, 1800, 1950, 2100],
 };
 
@@ -49,6 +50,14 @@ const HOMEDANT_HOUSE_SIZES = {
 const HOMEDANT_PERF_SIZES = {
   ...HOMEDANT_HOUSE_SIZES,
   width: HOMEDANT_HOUSE_SIZES.width.filter((v) => v <= 900),
+};
+
+// MAX 200 (light rack): beams 700-1500, depth supports 300/450/600,
+// posts 900-2400 (from the part files)
+const LR_SIZES = {
+  width: [700, 900, 1200, 1500],
+  depth: [300, 450, 600],
+  height: [900, 1200, 1500, 1800, 2100, 2400],
 };
 
 const EXHIBITION_SIZES = {
@@ -70,7 +79,7 @@ const PRODUCT_LIBRARY = [
     type: 'shelf',
     defaultSize: { width: 900, depth: 400, height: 1800 },
     sizeOptions: SPEEDRACK_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 2,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -86,6 +95,8 @@ const PRODUCT_LIBRARY = [
   {
     id: 'sp_heavy',
     brand: 'SPEEDRACK',
+    hidden: true, // old model, not rebuilt from the part files yet
+    legacy: true,
     category: 'Heavy Duty Shelf',
     name: 'Heavy Duty Shelf',
     type: 'heavy',
@@ -101,6 +112,8 @@ const PRODUCT_LIBRARY = [
   {
     id: 'sp_washer',
     brand: 'SPEEDRACK',
+    hidden: true,
+    legacy: true,
     category: 'Washing Machine Shelf',
     name: 'Washer / Dryer Shelf',
     type: 'frame_open',
@@ -121,7 +134,7 @@ const PRODUCT_LIBRARY = [
     type: 'shelf',
     defaultSize: { width: 300, depth: 300, height: 1800 },
     sizeOptions: SPEEDRACK_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 5,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -166,13 +179,42 @@ const PRODUCT_LIBRARY = [
     type: 'rolling',
     defaultSize: { width: 600, depth: 400, height: 900 },
     sizeOptions: SPEEDRACK_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 3,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
     addOns: ['additional shelf', 'handle'],
   },
 
+  // === MAX 200 (light rack) ===
+  {
+    id: 'lr_shelf',
+    brand: 'SPEEDRACK',
+    category: 'MAX 200',
+    name: 'MAX 200 Shelf',
+    type: 'shelf',
+    defaultSize: { width: 900, depth: 450, height: 1800 },
+    sizeOptions: LR_SIZES,
+    tierOptions: [2, 3, 4, 5, 6],
+    defaultTier: 5,
+    frameColors: ['white', 'black'],
+    boardColors: ['steel'],
+    addOns: [],
+  },
+  {
+    id: 'lr_rolling',
+    brand: 'SPEEDRACK',
+    category: 'MAX 200',
+    name: 'MAX 200 Rolling Shelf',
+    type: 'rolling',
+    defaultSize: { width: 900, depth: 450, height: 1800 },
+    sizeOptions: LR_SIZES,
+    tierOptions: [2, 3, 4, 5, 6],
+    defaultTier: 5,
+    frameColors: ['white', 'black'],
+    boardColors: ['steel'],
+    addOns: [],
+  },
   // === HOMEDANT HOUSE ===
   {
     id: 'hh_shelf',
@@ -182,7 +224,7 @@ const PRODUCT_LIBRARY = [
     type: 'shelf',
     defaultSize: { width: 900, depth: 400, height: 1800 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 2,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -212,7 +254,7 @@ const PRODUCT_LIBRARY = [
     type: 'shelf',
     defaultSize: { width: 300, depth: 300, height: 1800 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 4,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -273,7 +315,7 @@ const PRODUCT_LIBRARY = [
     type: 'rolling',
     defaultSize: { width: 600, depth: 400, height: 900 },
     sizeOptions: HOMEDANT_HOUSE_SIZES,
-    tierOptions: [2, 3, 4, 5],
+    tierOptions: [2, 3, 4, 5, 6, 7, 8],
     defaultTier: 3,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -288,7 +330,7 @@ const PRODUCT_LIBRARY = [
     type: 'pegboard',
     defaultSize: { width: 900, depth: 400, height: 1800 },
     sizeOptions: HOMEDANT_PERF_SIZES,
-    tierOptions: [3, 4, 5],
+    tierOptions: [3, 4, 5, 6, 7, 8],
     defaultTier: 4,
     frameColors: ['black', 'white'],
     boardColors: ['wood', 'white'],
@@ -1241,6 +1283,21 @@ const KO = {
   "New folder": "새 폴더",
   "New folder inside": "이 폴더 안에 새 폴더",
   "Folder name": "폴더 이름",
+  "MAX 200 Shelf": "경량랙",
+  "MAX 200 Rolling Shelf": "경량랙 바퀴형",
+  "MAX 200": "경량랙",
+  "steel": "스틸",
+  "Buyers": "바이어",
+  "Buyer name": "바이어 이름",
+  "New buyer folder": "새 바이어 폴더",
+  "New proposal for this buyer": "이 바이어에 새 제안",
+  "Manage folders": "폴더 관리",
+  "Click to start a new proposal": "누르면 새 제안으로 시작",
+  "No buyer selected": "바이어 선택 안 함",
+  "New proposal (not saved)": "새 제안 (저장 안 됨)",
+  "Outer size": "실제 외곽 치수",
+  "Cancel": "취소",
+  "will be deleted for everyone on the team.": "항목을 삭제합니다. 팀 전체에서 지워집니다.",
   "Delete this folder? What is inside moves up one level.": "이 폴더를 삭제할까요? 안에 있던 항목은 한 단계 위로 옮겨집니다.",
   "Name": "이름",
   "Move to folder": "폴더 이동",
@@ -1664,7 +1721,13 @@ function createVisitors(w, d) {
    now: put 'SPEEDRACK' back at the front of this list to show it again.
    Its products and builders are untouched, so saved layouts that already
    contain SPEEDRACK items still load and render.                       */
-const LIBRARY_BRANDS = ['HOMEDANT HOUSE', 'Exhibition'];
+const LIBRARY_BRANDS = ['HOMEDANT HOUSE', 'SPEEDRACK', 'Exhibition'];
+/* Products built on the shared frame system (posts, beams, levels you can
+   drag, display items): every HOMEDANT HOUSE product and the rebuilt
+   SPEEDRACK / MAX 200 ones.                                          */
+function isLevelProduct(tpl) {
+  return !!tpl && (tpl.brand === 'HOMEDANT HOUSE' || (tpl.brand === 'SPEEDRACK' && !tpl.legacy));
+}
 
 /* ----- HOMEDANT HOUSE shelf levels -----
    Each level has its own height and its own style. `h` is in mm from the
@@ -1684,8 +1747,64 @@ const HH_LEVEL_GAP = 99; // minimum distance between two levels
 function hhLevelKey(p) {
   return `${p.tier}-${p.height}`;
 }
+/* Frame specs. HH is the HOMEDANT HOUSE frame further down; these two
+   come from the SPEEDRACK and MAX 200 part files (sizes in metres):
+   - SPEEDRACK: single-layer L-angle post 33.6 mm, 1.5 mm steel, keyhole
+     slots 13.4 x 19.9 mm every 30 mm on both faces; beam 53 mm with a
+     15 mm lip on top, hooked in behind the post faces; L-shaped plastic
+     foot 39.6 mm, 20 mm tall. homedant.com lists the SS shelves 12 mm
+     wider and deeper than the size name, 11 mm taller (posts stand
+     above the top board), with 0.36" (9 mm) boards.
+   - MAX 200: C-channel post 42.1 x 45.3 mm, open toward the inside,
+     slots 11.3 x 15.4 mm every 30 mm on its front and back faces; 87 mm
+     C-beams front and back at the top and bottom levels, steel trays with
+     folded edges in between; square plastic foot 51 x 56 mm.          */
+const SP_SPEC = {
+  kind: 'sp',
+  flange: 0.0336,
+  postT: 0.0015,
+  sheet: 0.0012,
+  beamH: 0.053,
+  lip: 0.015,
+  board: 0.009,
+  bottomGap: 0.03,
+  levelMin: 92, // 30 gap + 53 beam + 9 board
+  step: 30,
+  gap: 99,
+  topRise: 0.011,
+};
+const LR_SPEC = {
+  kind: 'lr',
+  postW: 0.0421,
+  postD: 0.0453,
+  sheet: 0.0012,
+  beamH: 0.087,
+  trayLip: 0.035,
+  board: 0.002,
+  bottomGap: 0.03,
+  levelMin: 117, // 30 gap + 87 beam
+  step: 30,
+  gap: 99,
+};
+function specOfProduct(p) {
+  const id = (p && p.productId) || '';
+  if (id.startsWith('sp_')) return SP_SPEC;
+  if (id.startsWith('lr_')) return LR_SPEC;
+  return HH;
+}
+function specOf(mat) {
+  return mat && mat.userData && mat.userData.hh ? specOfProduct(mat.userData.hh.product) : HH;
+}
+// level rules (mm) for a product: lowest level, snap step, minimum gap
+function levelRule(p) {
+  const S = specOfProduct(p);
+  return S === HH
+    ? { min: HH_LEVEL_MIN, step: HH_LEVEL_STEP, gap: HH_LEVEL_GAP }
+    : { min: S.levelMin, step: S.step, gap: S.gap };
+}
 function hhDefaultLevels(p, tiers) {
   const n = tiers || p.tier || 1;
+  const LMIN = levelRule(p).min;
   // drawer hanger: one board over the drawers, one at the top
   if (p.productId === 'hh_drawer')
     return [
@@ -1695,7 +1814,7 @@ function hhDefaultLevels(p, tiers) {
   // perforated trolley: trays below, a flat top
   if ((p.productId === 'hh_trolley' || p.productId === 'hh_perf_trolley') && !p.shelfStyle)
     return Array.from({ length: n }, (_, i) => ({
-      h: n === 1 ? p.height : Math.round(HH_LEVEL_MIN + (i / (n - 1)) * (p.height - HH_LEVEL_MIN)),
+      h: n === 1 ? p.height : Math.round(LMIN + (i / (n - 1)) * (p.height - LMIN)),
       style: i === n - 1 ? 'basic' : 'basket',
     }));
   const style = p.shelfStyle === 'basket' ? 'basket' : 'basic';
@@ -1703,9 +1822,21 @@ function hhDefaultLevels(p, tiers) {
     h:
       n === 1
         ? p.height
-        : Math.round(HH_LEVEL_MIN + (i / (n - 1)) * (p.height - HH_LEVEL_MIN)),
-    style,
+        : Math.round(LMIN + (i / (n - 1)) * (p.height - LMIN)),
+    style: specOfProduct(p) === HH ? style : 'basic',
   }));
+}
+/* Tier counts that physically fit the chosen height. Up to 5 tiers are
+   always offered (as before); 6 and up need at least 150 mm per opening. */
+const TIER_MIN_OPENING = 150;
+function tierChoices(tpl, p) {
+  return tpl.tierOptions.filter(
+    (t) => t <= 5 || (p.height - levelRule(p).min) / (t - 1) >= TIER_MIN_OPENING
+  );
+}
+function fitTier(tpl, p) {
+  const ok = tierChoices(tpl, p);
+  return ok.includes(p.tier) ? p.tier : Math.max(...ok.filter((t) => t <= p.tier), ok[0]);
 }
 function hhResolveLevels(p, tiers) {
   const n = tiers || p.tier || 1;
@@ -1802,7 +1933,177 @@ function hhAdd(group, geo, mat, x, y, z) {
   return m;
 }
 
+/* Slot pattern for SPEEDRACK / MAX 200 post faces: one 30 mm pitch per
+   tile, the keyholes cut out (transparent) so you can see through them.
+   `fromRight`: the post corner is on the right edge of the face.      */
+const _frameSlotTex = {};
+function frameSlotTexture(kind, fromRight) {
+  const key = kind + (fromRight ? 'R' : 'L');
+  if (_frameSlotTex[key]) return _frameSlotTex[key];
+  const sp = kind === 'sp';
+  const PX = 4; // px per mm
+  const faceW = sp ? 33.6 : 42.1,
+    pitch = 30;
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(faceW * PX);
+  cv.height = pitch * PX;
+  const x = cv.getContext('2d');
+  x.fillStyle = '#ffffff';
+  x.fillRect(0, 0, cv.width, cv.height);
+  const sw = sp ? 13.4 : 11.3,
+    sh = sp ? 19.9 : 15.4,
+    bottom = sp ? 4.8 : 8.3;
+  // SPEEDRACK slots sit 20.6 mm from the corner; MAX 200 ones are centred
+  const cu = sp ? (fromRight ? faceW - 20.6 : 20.6) : faceW / 2;
+  const P = (u, z) => [u * PX, (pitch - z) * PX];
+  const top = bottom + sh,
+    wide = sw / 2,
+    neck = sw * 0.29,
+    shoulder = top - sh * 0.42,
+    waist = shoulder - sh * 0.16;
+  x.globalCompositeOperation = 'destination-out';
+  x.beginPath();
+  x.moveTo(...P(cu - wide, top));
+  x.lineTo(...P(cu + wide, top));
+  x.lineTo(...P(cu + wide, shoulder));
+  x.lineTo(...P(cu + neck, waist));
+  x.lineTo(...P(cu + neck, bottom));
+  x.lineTo(...P(cu - neck, bottom));
+  x.lineTo(...P(cu - neck, waist));
+  x.lineTo(...P(cu - wide, shoulder));
+  x.closePath();
+  x.fill();
+  x.globalCompositeOperation = 'source-over';
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  _frameSlotTex[key] = tex;
+  return tex;
+}
+function slottedFaceMat(frameMat, kind, fromRight, height) {
+  const tex = frameSlotTexture(kind, fromRight).clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(1, height / 0.03);
+  return new THREE.MeshStandardMaterial({
+    color: frameMat.color.getHex(),
+    map: tex,
+    alphaTest: 0.5,
+    side: THREE.DoubleSide,
+    metalness: frameMat.metalness,
+    roughness: frameMat.roughness,
+  });
+}
+const CORNERS = [
+  [-1, -1],
+  [1, -1],
+  [-1, 1],
+  [1, 1],
+];
+// SPEEDRACK: open L-angle, one layer of steel, slots on both faces
+function addSPPosts(group, w, d, h, frameMat) {
+  const F = SP_SPEC.flange;
+  const H = h + SP_SPEC.topRise; // posts stand a little above the top board
+  const mL = slottedFaceMat(frameMat, 'sp', false, H),
+    mR = slottedFaceMat(frameMat, 'sp', true, H);
+  const face = new THREE.PlaneGeometry(F, H);
+  CORNERS.forEach(([sx, sz]) => {
+    const ex = sx * (w / 2),
+      ez = sz * (d / 2);
+    hhAdd(group, face, sx > 0 ? mR : mL, ex - sx * (F / 2), H / 2, ez - sz * 0.0008);
+    const side = hhAdd(group, face, sz > 0 ? mR : mL, ex - sx * 0.0008, H / 2, ez - sz * (F / 2));
+    side.rotation.y = -Math.PI / 2;
+  });
+}
+// MAX 200: C-channel, closed on the outside, open toward the shelf
+function addLRPosts(group, w, d, h, frameMat) {
+  const { postW: PW, postD: PD, sheet: t } = LR_SPEC;
+  const faceMat = slottedFaceMat(frameMat, 'lr', false, h);
+  const face = new THREE.PlaneGeometry(PW, h);
+  const outer = new THREE.BoxGeometry(t, h, PD);
+  const lipW = 0.008;
+  const lip = new THREE.BoxGeometry(t, h, lipW);
+  CORNERS.forEach(([sx, sz]) => {
+    const ex = sx * (w / 2),
+      ez = sz * (d / 2);
+    hhAdd(group, outer, frameMat, ex - sx * (t / 2), h / 2, ez - sz * (PD / 2));
+    hhAdd(group, face, faceMat, ex - sx * (PW / 2), h / 2, ez - sz * 0.0006);
+    hhAdd(group, face, faceMat, ex - sx * (PW / 2), h / 2, ez - sz * (PD - 0.0006));
+    hhAdd(group, lip, frameMat, ex - sx * (PW - t / 2), h / 2, ez - sz * (lipW / 2 + 0.0006));
+    hhAdd(group, lip, frameMat, ex - sx * (PW - t / 2), h / 2, ez - sz * (PD - lipW / 2 - 0.0006));
+  });
+}
+function plasticOf(frameMat) {
+  const hex = frameMat.color.getHex();
+  const m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.8, metalness: 0 });
+  if (isLightHex(hex)) m.color.multiplyScalar(0.9);
+  return m;
+}
+// SPEEDRACK foot (안전좌): an L-shaped plastic cap around the post bottom
+function addSPFeet(group, w, d, frameMat) {
+  const m = plasticOf(frameMat);
+  const L = 0.0396,
+    H = 0.02,
+    T = 0.003;
+  const gx = new THREE.BoxGeometry(L, H, T),
+    gz = new THREE.BoxGeometry(T, H, L),
+    pad = new THREE.BoxGeometry(L * 0.62, 0.004, L * 0.62);
+  CORNERS.forEach(([sx, sz]) => {
+    const ex = sx * (w / 2),
+      ez = sz * (d / 2);
+    hhAdd(group, gx, m, ex - sx * (L / 2), H / 2, ez - sz * (T / 2));
+    hhAdd(group, gz, m, ex - sx * (T / 2), H / 2, ez - sz * (L / 2));
+    hhAdd(group, pad, m, ex - sx * (L * 0.31), 0.002, ez - sz * (L * 0.31));
+  });
+}
+// MAX 200 foot: a square plastic cap the post stands in
+function addLRFeet(group, w, d, frameMat) {
+  const m = plasticOf(frameMat);
+  const { postW: PW, postD: PD } = LR_SPEC;
+  const g = new THREE.BoxGeometry(PW + 0.009, 0.024, PD + 0.011);
+  CORNERS.forEach(([sx, sz]) => {
+    hhAdd(group, g, m, sx * (w / 2 - PW / 2), 0.012, sz * (d / 2 - PD / 2));
+  });
+}
+/* MAX 200 level. Top and bottom levels: 87 mm C-beams front and back
+   with a steel deck between them. Levels in between: a steel tray with
+   its front and back edges folded down, on depth supports at the sides. */
+function addLRLevel(group, w, d, yBoard, frameMat, thickness) {
+  const { postW: PW, sheet: t, beamH: BH, trayLip: TL } = LR_SPEC;
+  const cur = frameMat.userData.hh.cur || { i: 0, n: 1 };
+  const top = yBoard + thickness / 2;
+  const wi = w - 2 * PW; // between the posts
+  const hex = frameMat.color.getHex();
+  const deckTop = frameMat.clone();
+  if (isLightHex(hex)) deckTop.color.setHex(hex).multiplyScalar(0.86);
+  const deckMat = [frameMat, frameMat, deckTop, frameMat, frameMat, frameMat];
+  const isEnd = cur.i === 0 || cur.i === cur.n - 1;
+  if (isEnd) {
+    const D = 0.0104; // beam depth
+    [-1, 1].forEach((s) => {
+      const z = s * (d / 2);
+      hhAdd(group, new THREE.BoxGeometry(wi, BH, t), frameMat, 0, top - BH / 2, z - s * (t / 2));
+      hhAdd(group, new THREE.BoxGeometry(wi, t, D), frameMat, 0, top - t / 2, z - s * (D / 2));
+      hhAdd(group, new THREE.BoxGeometry(wi, t, D), frameMat, 0, top - BH + t / 2, z - s * (D / 2));
+      hhAdd(group, new THREE.BoxGeometry(wi, 0.006, t), frameMat, 0, top - BH + 0.004, z - s * (D - t / 2));
+    });
+    hhAdd(group, new THREE.BoxGeometry(wi - 0.002, 0.0015, d - 2 * D), deckMat, 0, top - 0.00075, 0);
+  } else {
+    hhAdd(group, new THREE.BoxGeometry(wi - 0.002, 0.0015, d - 0.003), deckMat, 0, top - 0.00075, 0);
+    [-1, 1].forEach((s) => {
+      hhAdd(group, new THREE.BoxGeometry(wi - 0.002, TL, t), frameMat, 0, top - TL / 2, s * (d / 2 - 0.0015 - t / 2));
+      hhAdd(group, new THREE.BoxGeometry(wi - 0.002, t, 0.008), frameMat, 0, top - TL + t / 2, s * (d / 2 - 0.0055));
+      // depth support under the tray at each side
+      hhAdd(group, new THREE.BoxGeometry(t, 0.025, d - 0.01), frameMat, s * (wi / 2 - 0.0015), top - 0.0015 - 0.0125, 0);
+      hhAdd(group, new THREE.BoxGeometry(0.02, t, d - 0.01), frameMat, s * (wi / 2 - 0.011), top - 0.0015 - 0.025, 0);
+    });
+  }
+}
+
 function addHHPosts(group, w, d, h, frameMat) {
+  const S = specOf(frameMat);
+  if (S.kind === 'sp') return addSPPosts(group, w, d, h, frameMat);
+  if (S.kind === 'lr') return addLRPosts(group, w, d, h, frameMat);
   const { flange: F, postT: T, sheet: t } = HH;
   const slotMat = frameMat.userData.hh.slotMat;
   slotMat.map.repeat.set(1, h / HH.slotPitch);
@@ -1812,8 +2113,24 @@ function addHHPosts(group, w, d, h, frameMat) {
   const innerX = new THREE.BoxGeometry(innerW, h, t);
   const innerZ = new THREE.BoxGeometry(t, h, innerW);
   const hem = new THREE.CylinderGeometry(T / 2, T / 2, h, 10);
-  const capX = new THREE.BoxGeometry(F, 0.002, T);
-  const capZ = new THREE.BoxGeometry(T, 0.002, F - T);
+  // safety cap: a plastic L sleeve over the post top, in the frame colour.
+  // Its top face is toned down so a light colour doesn't burn out to white
+  // under the top light (same trick as the boards).
+  const CAP_H = 0.016,
+    CAP_E = 0.0012; // sits a hair proud of the post
+  const capX = new THREE.BoxGeometry(F + CAP_E, CAP_H, T + CAP_E);
+  const capZ = new THREE.BoxGeometry(T + CAP_E, CAP_H, F - T);
+  const capHex = frameMat.color.getHex();
+  const capLight = isLightHex(capHex);
+  const capSide = new THREE.MeshStandardMaterial({
+    color: capHex,
+    roughness: frameMat.roughness,
+    metalness: frameMat.metalness,
+  });
+  capSide.color.multiplyScalar(capLight ? 0.88 : 1);
+  const capTop = capSide.clone();
+  capTop.color.setHex(capHex).multiplyScalar(capLight ? 0.7 : 1);
+  const capMat = [capSide, capSide, capTop, capSide, capSide, capSide];
   [
     [-1, -1],
     [1, -1],
@@ -1846,19 +2163,16 @@ function addHHPosts(group, w, d, h, frameMat) {
     hhAdd(group, hem, frameMat, ex - sx * F, h / 2, ez - sz * (T / 2));
     hhAdd(group, hem, frameMat, ex - sx * (T / 2), h / 2, ez - sz * F);
     // top cap closing the L
-    hhAdd(group, capX, frameMat, ex - sx * (F / 2), h + 0.001, ez - sz * (T / 2));
-    hhAdd(
-      group,
-      capZ,
-      frameMat,
-      ex - sx * (T / 2),
-      h + 0.001,
-      ez - sz * (T + (F - T) / 2)
-    );
+    const capY = h + HH_CAP_RISE * MM_TO_M - CAP_H / 2; // top of the cap 11 mm above the frame
+    hhAdd(group, capX, capMat, ex - sx * (F / 2), capY, ez - sz * (T / 2));
+    hhAdd(group, capZ, capMat, ex - sx * (T / 2), capY, ez - sz * (T + (F - T) / 2));
   });
 }
 
 function addHHFeet(group, w, d, footMat) {
+  const S = specOf(footMat);
+  if (S.kind === 'sp') return addSPFeet(group, w, d, footMat);
+  if (S.kind === 'lr') return addLRFeet(group, w, d, footMat);
   const { flange: F, postT: T } = HH;
   const fh = 0.006;
   const gx = new THREE.BoxGeometry(F + 0.001, fh, T + 0.001);
@@ -1880,8 +2194,10 @@ function addHHFeet(group, w, d, footMat) {
    style; the basket style keeps the level at the same height but flips
    the beams, so the rim top lands where the board top was.            */
 function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style, perfH = 0, perfUp = false) {
-  const { flange: F, postT: T, sheet: t, beamH: BH, lip: LIP } = HH;
-  const basket = (style || frameMat.userData.hh.style) === 'basket';
+  const S = specOf(frameMat);
+  if (S.kind === 'lr') return addLRLevel(group, w, d, yBoard, frameMat, thickness);
+  const { flange: F, postT: T, sheet: t, beamH: BH, lip: LIP } = S;
+  const basket = S === HH && (style || frameMat.userData.hh.style) === 'basket';
   const beamTop = basket ? yBoard + thickness / 2 : yBoard - thickness / 2;
   const beamMid = beamTop - BH / 2;
   const lipY = basket ? beamTop - BH + t / 2 : beamTop - t / 2;
@@ -2259,7 +2575,7 @@ function addBoardWithBeams(
 }
 
 function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
-  const {
+  let {
     skipBottom = false,
     postSize = 0.025,
     thickness = 0.009,
@@ -2271,8 +2587,10 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
   // Bottom board top = bottomLift + beamH + thickness  (just above foot caps)
   // Top board top   = h
   const isHH = !!(frameMat.userData && frameMat.userData.hh);
+  const S = isHH ? specOf(frameMat) : null;
+  if (S && S.board) thickness = S.board;
   const yBoardBottom = isHH
-    ? HH.bottomGap + HH.beamH + thickness / 2
+    ? S.bottomGap + S.beamH + thickness / 2
     : bottomLift + beamH + thickness / 2;
   const yBoardTop = h - thickness / 2;
   const start = skipBottom ? 1 : 0;
@@ -2286,6 +2604,7 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
     else if (i === 0) y = yBoardBottom;
     else y = yBoardBottom + (i / (tiers - 1)) * (yBoardTop - yBoardBottom);
     if (hhLevels) y = hhLevels[i].h * MM_TO_M - thickness / 2;
+    if (isHH) frameMat.userData.hh.cur = { i, n: tiers };
     const before = group.children.length;
     addBoardWithBeams(group, w, d, y, boardMat, frameMat, {
       postSize,
@@ -2303,13 +2622,13 @@ function addTierBoards(group, w, d, h, tiers, boardMat, opts = {}) {
       const L = hhLevels[i];
       const basket = L.style === 'basket';
       const top = basket
-        ? L.h * MM_TO_M - HH.beamH + HH.sheet + thickness
+        ? L.h * MM_TO_M - S.beamH + S.sheet + thickness
         : L.h * MM_TO_M;
       let clear = 0.42; // top level: open above
       if (i < tiers - 1) {
         const N = hhLevels[i + 1];
         const nextBeamBottom =
-          N.h * MM_TO_M - HH.beamH - (N.style === 'basket' ? 0 : thickness);
+          N.h * MM_TO_M - S.beamH - (N.style === 'basket' ? 0 : thickness);
         clear = nextBeamBottom - top - 0.015;
       }
       // under a hanger bar the clothes need most of the height
@@ -2332,10 +2651,10 @@ function buildShelf(group, p, tpl) {
   const w = p.width * MM_TO_M,
     d = p.depth * MM_TO_M,
     h = p.height * MM_TO_M;
-  const perforated = tpl.brand === 'SPEEDRACK';
+  const perforated = tpl.brand === 'SPEEDRACK' && !isLevelProduct(tpl);
   const mats = makeMaterials(p, {
     perforated,
-    house: tpl.brand === 'HOMEDANT HOUSE',
+    house: isLevelProduct(tpl),
   });
   addPosts(group, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   const skipBottom = tpl.type === 'open_base';
@@ -3053,7 +3372,8 @@ function addHangingClothes(group, w, d, rodY, maxLen, seed) {
    the shelf, held by a round cup on the inside of each SIDE beam of the
    top level, low on the beam so the cup hangs just below its edge.     */
 function addHHHangerBar(group, w, d, frameMat, tiers, li = tiers - 1) {
-  const { postT: T, sheet: t, beamH: BH } = HH;
+  const SB = specOf(frameMat);
+  const { postT: T, sheet: t, beamH: BH } = SB.kind === 'lr' ? HH : SB;
   const hh = frameMat.userData.hh;
   const lv = hhResolveLevels(hh.product, tiers);
   const top = lv[li];
@@ -3092,10 +3412,52 @@ function addHHHangerBar(group, w, d, frameMat, tiers, li = tiers - 1) {
    is 104 mm from the floor to the underside of the post. Built around
    the swivel axis, with the wheel trailing behind it.                  */
 const HH_CASTER_H = 0.104;
-function addHHCaster(group, x, z, angle, brake) {
+// models up to 600 wide and 400 deep take 2-inch casters: 2.7" (69 mm)
+// instead of 4.1" (104 mm) from the floor to the post
+// (homedant.com: 62.2" vs 59.5" for 600x400)
+const HH_CASTER_H2 = 0.069;
+const hhSmallCaster = (p) => p.width <= 600 && p.depth <= 400;
+function hhCasterH(p) {
+  return p.caster2in ? HH_CASTER_H2 : HH_CASTER_H;
+}
+/* What you pick is the size name (900 x 400 x 1800). The real product
+   is a little bigger outside: homedant.com lists 36.2" x 16.5" x 71.3"
+   for that one, i.e. +20 mm on width and depth (+22 mm at 1200 wide) and
+   the post caps standing 11 mm above the frame. The 3D uses the real
+   outside, the name stays as picked.                                    */
+const HH_CAP_RISE = 11;
+function hhOuterMM(v) {
+  return v + (v >= 1200 ? 22 : 20);
+}
+const inch1 = (mm) => (mm / 25.4).toFixed(1);
+function hhOuterLabel(p) {
+  const o = hhOuterSize(p);
+  return {
+    mm: `${o.width} x ${o.depth} x ${o.height} mm`,
+    inch: `${inch1(o.width)} x ${inch1(o.depth)} x ${inch1(o.height)} in`,
+  };
+}
+function hhOuterSize(p) {
+  const rolling = ['hh_rolling', 'hh_trolley', 'hh_perf_trolley', 'sp_rolling', 'lr_rolling'].includes(p.productId);
+  const casterMM = rolling ? (hhSmallCaster(p) ? 69 : 104) : 0;
+  const S = specOfProduct(p);
+  if (S.kind === 'sp')
+    // homedant.com SS shelves: 12 mm wider and deeper, 11 mm taller
+    return { width: p.width + 12, depth: p.depth + 12, height: p.height + 11 + casterMM };
+  if (S.kind === 'lr')
+    // no published outside size yet: drawn to the size name
+    return { width: p.width, depth: p.depth, height: p.height + casterMM };
+  return {
+    width: hhOuterMM(p.width),
+    depth: hhOuterMM(p.depth),
+    height: p.height + HH_CAP_RISE + casterMM,
+  };
+}
+function addHHCaster(group, x, z, angle, brake, scale = 1) {
   const g = new THREE.Group();
   g.position.set(x, 0, z);
   g.rotation.y = angle;
+  g.scale.setScalar(scale);
   const black = new THREE.MeshStandardMaterial({
     color: 0x161616,
     metalness: 0.2,
@@ -3154,7 +3516,8 @@ function addHHCaster(group, x, z, angle, brake) {
   group.add(g);
 }
 
-function addHHCasters(group, inner, w, d) {
+function addHHCasters(group, inner, w, d, casterH = HH_CASTER_H) {
+  const scale = casterH / HH_CASTER_H;
   const { postT: T } = HH;
   const zinc = new THREE.MeshStandardMaterial({
     color: 0xc9cdd2,
@@ -3178,8 +3541,10 @@ function addHHCasters(group, inner, w, d) {
     hhAdd(inner, base, zinc, ex - sx * 0.022, 0.0015, ez - sz * 0.022);
     // caster under the bracket; the left pair (as you face it) carries
     // the brakes, the right pair turns freely
-    const angle = (sx > 0 ? Math.PI : 0) + sz * 0.4;
-    addHHCaster(group, ex - sx * 0.022, ez - sz * 0.022, angle, sx < 0);
+    // wheels trail in under the frame, so the casters stay inside the
+    // shelf's footprint (homedant.com gives the same W x D for both)
+    const angle = sx > 0 ? -sz * 0.4 : Math.PI + sz * 0.4;
+    addHHCaster(group, ex - sx * 0.022, ez - sz * 0.022, angle, sx < 0, scale);
   });
 }
 
@@ -3194,7 +3559,7 @@ function buildGarmentRack(group, p, tpl) {
   const perforated = tpl.brand === 'SPEEDRACK';
   const mats = makeMaterials(p, {
     perforated,
-    house: tpl.brand === 'HOMEDANT HOUSE',
+    house: isLevelProduct(tpl),
   });
   addPosts(group, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   const gTiers = p.tier || tpl.defaultTier;
@@ -3235,20 +3600,20 @@ function buildRolling(group, p, tpl) {
   const perforated = tpl.brand === 'SPEEDRACK';
   const mats = makeMaterials(p, {
     perforated,
-    house: tpl.brand === 'HOMEDANT HOUSE',
+    house: isLevelProduct(tpl),
   });
   const isHH = !!mats.frame.userData.hh;
   const wheelR = 0.04;
   // the frame is lifted by the height of the wheels
   const inner = new THREE.Group();
-  inner.position.y = isHH ? HH_CASTER_H : wheelR * 2;
+  inner.position.y = isHH ? hhCasterH(p) : wheelR * 2;
   addPosts(inner, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   addTierBoards(inner, w, d, h, p.tier || tpl.defaultTier, mats.board, {
     frameMat: mats.frame,
   });
   group.add(inner);
   if (isHH) {
-    addHHCasters(group, inner, w, d);
+    addHHCasters(group, inner, w, d, hhCasterH(p));
     return;
   }
   // wheels
@@ -3416,11 +3781,11 @@ function buildHHTrolley(group, p, tpl) {
     }
   }
   const inner = new THREE.Group();
-  inner.position.y = HH_CASTER_H;
+  inner.position.y = hhCasterH(p);
   addPosts(inner, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
   addTierBoards(inner, w, d, h, tiers, mats.board, { frameMat: mats.frame });
   group.add(inner);
-  addHHCasters(group, inner, w, d);
+  addHHCasters(group, inner, w, d, hhCasterH(p));
 
   // push handle: a moulded bracket over each post top at one end, and a
   // tube between them
@@ -4390,6 +4755,11 @@ function buildTVStand(group, p) {
 
 function buildProductMesh(p, tpl) {
   const group = new THREE.Group();
+  // HOMEDANT HOUSE: draw the real outside width and depth (see hhOuterSize)
+  if (isLevelProduct(tpl)) {
+    const o = hhOuterSize(p);
+    p = { ...p, width: o.width, depth: o.depth, caster2in: hhSmallCaster(p) };
+  }
   switch (tpl.type) {
     case 'shelf':
       buildShelf(group, p, tpl);
@@ -4503,6 +4873,401 @@ async function cloud(fn, args) {
 /* Folders and saved items for one kind ('booth' or 'buyer').
    getCurrent() returns { name, data, thumbnail } for "save";
    onOpen(item) receives a saved item with its data.               */
+/* The shared list of folders and saved items for one app ('buyer' or
+   'booth'), with the team code. Used by the buyer sidebar.            */
+function useCloudList(kind, enabled) {
+  const [code, setCode] = useState(loadTeamCode);
+  const [authed, setAuthed] = useState(false);
+  const [folders, setFolders] = useState([]);
+  const [items, setItems] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const fail = (e) => {
+    if (e.badCode) {
+      storeTeamCode('');
+      setCode('');
+      setAuthed(false);
+      setError(tr('The team code is not correct.'));
+    } else setError(tr('Could not reach the shared library.') + ' ' + e.message);
+  };
+  const refresh = async (c = code) => {
+    if (!c) return;
+    setBusy(true);
+    setError('');
+    try {
+      const r = await cloud('booth_list', { p_code: c, p_kind: kind });
+      setFolders(r.folders || []);
+      setItems(r.items || []);
+      setAuthed(true);
+      if (c !== code) setCode(c);
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+  useEffect(() => {
+    if (enabled && code) refresh(code);
+  }, []);
+  const login = async (raw) => {
+    const c = (raw || '').trim();
+    if (!c) return;
+    setBusy(true);
+    setError('');
+    try {
+      const ok = await cloud('booth_check', { p_code: c });
+      if (!ok) {
+        setError(tr('The team code is not correct.'));
+        setBusy(false);
+        return;
+      }
+      storeTeamCode(c);
+      setCode(c);
+      await refresh(c);
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+    }
+  };
+  const run = async (fn, args) => {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await cloud(fn, { p_code: code, ...args });
+      await refresh();
+      return r;
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+      return null;
+    }
+  };
+  const get = async (id) => {
+    try {
+      return await cloud('booth_get_item', { p_code: code, p_id: id });
+    } catch (e) {
+      fail(e);
+      return null;
+    }
+  };
+  return { kind, code, authed, folders, items, busy, error, refresh, login, run, get };
+}
+
+/* Buyer app, left side: buyers (folders) with their proposals on top,
+   the products underneath. A product clicked here starts a new
+   proposal for the buyer that is open.                                */
+function BuyerSidebar({ lib, folderId, setFolderId, cloudId, onOpenItem, onNewProposal, onPickProduct, productId, onManage }) {
+  const [open, setOpen] = useState({}); // expanded folders
+  const [editing, setEditing] = useState(null); // { type: 'newFolder' | 'folder' | 'item', id }
+  const [ask, setAsk] = useState(null); // { text, onYes }
+  const [codeInput, setCodeInput] = useState('');
+  const { folders, items } = lib;
+  const childrenOf = (pid) => folders.filter((f) => (f.parent_id || null) === pid);
+  const itemsIn = (fid) => items.filter((it) => (it.folder_id || null) === fid);
+  const countIn = (fid) => itemsIn(fid).length + childrenOf(fid).reduce((n, f) => n + countIn(f.id), 0);
+  const isOpen = (fid) => open[fid] !== undefined ? open[fid] : fid === folderId;
+  // keep the folder of the open proposal expanded
+  useEffect(() => {
+    if (folderId) setOpen((o) => ({ ...o, [folderId]: true }));
+  }, [folderId]);
+
+  const iconBtn = 'p-1 rounded text-gray-400 hover:text-gray-800 hover:bg-gray-100';
+  const itemRow = (it) =>
+    editing && editing.type === 'item' && editing.id === it.id ? (
+      <div key={it.id} className="py-0.5">
+        <InlineName
+          initial={it.name}
+          onCommit={async (n) => {
+            setEditing(null);
+            await lib.run('booth_save_item', { p_item: { id: it.id, name: n } });
+          }}
+          onCancel={() => setEditing(null)}
+          className="w-full"
+        />
+      </div>
+    ) : (
+      <div
+        key={it.id}
+        onClick={() => onOpenItem(it)}
+        className={
+          'group flex items-center gap-2 px-1.5 py-1 mb-0.5 rounded-md cursor-pointer ' +
+          (it.id === cloudId ? 'bg-gray-900 text-white' : 'hover:bg-white')
+        }
+      >
+        <span className="flex-none w-9 h-7 rounded overflow-hidden bg-gray-200">
+          {it.thumbnail && <img src={it.thumbnail} alt="" className="w-full h-full object-cover" />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs truncate">{it.name}</span>
+          <span className={'block text-[10px] ' + (it.id === cloudId ? 'text-gray-300' : 'text-gray-400')}>
+            {new Date(it.updated_at).toLocaleDateString()}
+          </span>
+        </span>
+        <span className="hidden group-hover:flex items-center">
+          <button
+            title={tr('Rename')}
+            className={iconBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditing({ type: 'item', id: it.id });
+            }}
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+          <button
+            title={tr('Delete')}
+            className={iconBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              setAsk({
+                text: `“${it.name}” ` + tr('will be deleted for everyone on the team.'),
+                onYes: async () => {
+                  await lib.run('booth_delete_item', { p_id: it.id });
+                  if (it.id === cloudId) onNewProposal(folderId);
+                },
+              });
+            }}
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </span>
+      </div>
+    );
+
+  const folderBlock = (f, depth) => {
+    const expanded = isOpen(f.id);
+    const active = f.id === folderId;
+    return (
+      <div key={f.id}>
+        {editing && editing.type === 'folder' && editing.id === f.id ? (
+          <div className="py-0.5" style={{ paddingLeft: depth * 12 }}>
+            <InlineName
+              initial={f.name}
+              onCommit={async (n) => {
+                setEditing(null);
+                await lib.run('booth_save_folder', { p_folder: { id: f.id, name: n } });
+              }}
+              onCancel={() => setEditing(null)}
+              className="w-full"
+            />
+          </div>
+        ) : (
+          <div
+            onClick={() => {
+              setOpen((o) => ({ ...o, [f.id]: !expanded }));
+              setFolderId(f.id);
+            }}
+            className={'group flex items-center gap-1.5 px-1.5 py-1.5 rounded-md cursor-pointer text-xs ' + (active ? 'bg-white font-medium' : 'hover:bg-white text-gray-700')}
+            style={{ paddingLeft: 6 + depth * 12 }}
+          >
+            {expanded ? <ChevronDown className="w-3 h-3 text-gray-400 flex-none" /> : <ChevronRight className="w-3 h-3 text-gray-400 flex-none" />}
+            <FolderOpen className="w-3.5 h-3.5 flex-none text-gray-500" />
+            <span className="flex-1 truncate">{f.name}</span>
+            <span className="group-hover:hidden text-[11px] text-gray-400">{countIn(f.id)}</span>
+            <span className="hidden group-hover:flex items-center">
+              <button
+                title={tr('Rename')}
+                className={iconBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditing({ type: 'folder', id: f.id });
+                }}
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+              <button
+                title={tr('Delete')}
+                className={iconBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAsk({
+                    text: `“${f.name}” ` + tr('Delete this folder? What is inside moves up one level.'),
+                    onYes: async () => {
+                      await lib.run('booth_delete_folder', { p_id: f.id });
+                      if (active) setFolderId(f.parent_id || null);
+                    },
+                  });
+                }}
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </span>
+          </div>
+        )}
+        {expanded && (
+          <div className="ml-3 pl-2 border-l mb-1" style={{ borderColor: UI_LINE, marginLeft: 12 + depth * 12 }}>
+            {childrenOf(f.id).map((c) => folderBlock(c, 0))}
+            {itemsIn(f.id).map(itemRow)}
+            <button
+              onClick={() => onNewProposal(f.id)}
+              className="w-full text-left text-[11px] text-gray-600 px-2 py-1 mt-0.5 rounded-md border border-dashed border-gray-300 hover:bg-white"
+            >
+              + {tr('New proposal for this buyer')}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const loose = itemsIn(null);
+  const folderName = folderId ? (folders.find((f) => f.id === folderId) || {}).name : null;
+  return (
+    <div className="p-3 relative">
+      <div className="flex items-center justify-between mb-1.5 px-0.5">
+        <span className="text-[11px] font-semibold tracking-wide text-gray-500">{tr('Buyers')}</span>
+        <span className="flex items-center gap-1">
+          {lib.busy && <span className="text-[10px] text-gray-400">{tr('Working…')}</span>}
+          {lib.authed && (
+            <button title={tr('Manage folders')} onClick={onManage} className={iconBtn}>
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </span>
+      </div>
+
+      {!lib.authed ? (
+        <div className="rounded-lg border bg-white p-3 mb-3" style={{ borderColor: UI_LINE }}>
+          <div className="text-xs text-gray-700 mb-2">{tr('Enter the team code')}</div>
+          <div className="flex gap-1.5">
+            <input
+              type="password"
+              value={codeInput}
+              onChange={(e) => setCodeInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && lib.login(codeInput)}
+              className="flex-1 min-w-0 text-xs border border-gray-300 rounded px-2 py-1"
+            />
+            <button onClick={() => lib.login(codeInput)} className="text-xs px-2.5 py-1 rounded bg-gray-900 text-white">
+              {tr('Open')}
+            </button>
+          </div>
+          {lib.error && <div className="text-[11px] text-red-600 mt-1.5">{lib.error}</div>}
+        </div>
+      ) : (
+        <div className="mb-3">
+          {lib.error && <div className="text-[11px] text-red-600 mb-1.5">{lib.error}</div>}
+          {childrenOf(null).map((f) => folderBlock(f, 0))}
+          {loose.length > 0 && (
+            <div>
+              <div
+                onClick={() => setOpen((o) => ({ ...o, __none: !o.__none }))}
+                className="flex items-center gap-1.5 px-1.5 py-1.5 rounded-md cursor-pointer text-xs text-gray-500 hover:bg-white"
+              >
+                {open.__none ? <ChevronDown className="w-3 h-3 text-gray-400" /> : <ChevronRight className="w-3 h-3 text-gray-400" />}
+                <FolderOpen className="w-3.5 h-3.5 text-gray-400" />
+                <span className="flex-1">{tr('No folder')}</span>
+                <span className="text-[11px] text-gray-400">{loose.length}</span>
+              </div>
+              {open.__none && <div className="ml-3 pl-2 border-l mb-1" style={{ borderColor: UI_LINE }}>{loose.map(itemRow)}</div>}
+            </div>
+          )}
+          {editing && editing.type === 'newFolder' ? (
+            <div className="flex items-center gap-1.5 px-1.5 py-1">
+              <FolderOpen className="w-3.5 h-3.5 text-gray-500 flex-none" />
+              <InlineName
+                placeholder={tr('Buyer name')}
+                onCommit={async (n) => {
+                  setEditing(null);
+                  const r = await lib.run('booth_save_folder', { p_folder: { kind: lib.kind, name: n, parent_id: null } });
+                  if (r) onNewProposal(r.id);
+                }}
+                onCancel={() => setEditing(null)}
+                className="flex-1"
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setEditing({ type: 'newFolder' })}
+              className="w-full mt-1.5 text-xs text-gray-600 py-1.5 rounded-md border border-dashed border-gray-300 hover:bg-white"
+            >
+              + {tr('New buyer folder')}
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-baseline justify-between mb-1.5 mt-4 px-0.5">
+        <span className="text-[11px] font-semibold tracking-wide text-gray-500">{tr('Products')}</span>
+        {folderName && cloudId && <span className="text-[10px] text-gray-400 truncate ml-2">{tr('Click to start a new proposal')}</span>}
+      </div>
+      {BUYER_TEMPLATES.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onPickProduct(t)}
+          className={
+            'w-full flex items-center gap-2.5 text-left px-2.5 py-1.5 mb-1 rounded-lg border transition ' +
+            (t.id === productId ? 'bg-white border-gray-900' : 'bg-white border-gray-200 hover:border-gray-400')
+          }
+        >
+          <ProductThumb type={t.type} tpl={t} />
+          <span className="min-w-0">
+            <span className="block text-xs font-medium text-gray-900 truncate">{tr(t.name)}</span>
+            <span className="block text-[11px] text-gray-500">
+              {t.defaultSize.width}×{t.defaultSize.depth}×{t.defaultSize.height}mm
+            </span>
+          </span>
+        </button>
+      ))}
+
+      {ask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.2)' }} onClick={() => setAsk(null)}>
+          <div className="bg-white rounded-lg shadow-xl border p-4 w-80" style={{ borderColor: UI_LINE }} onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm text-gray-800 mb-4 leading-relaxed">{ask.text}</div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setAsk(null)} className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:border-gray-400">
+                {tr('Cancel')}
+              </button>
+              <button
+                autoFocus
+                onClick={() => {
+                  const a = ask;
+                  setAsk(null);
+                  a.onYes();
+                }}
+                className="text-xs font-medium px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700"
+              >
+                {tr('Delete')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* One-line name editor used inside the library instead of the browser's
+   prompt box. Enter saves, Esc cancels, clicking away saves. */
+function InlineName({ initial = '', placeholder, onCommit, onCancel, className = '' }) {
+  const [v, setV] = useState(initial);
+  const done = useRef(false);
+  const commit = () => {
+    if (done.current) return;
+    done.current = true;
+    const t = v.trim();
+    if (t && t !== initial) onCommit(t);
+    else onCancel();
+  };
+  return (
+    <input
+      autoFocus
+      value={v}
+      placeholder={placeholder}
+      onChange={(e) => setV(e.target.value)}
+      onFocus={(e) => e.target.select()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commit();
+        if (e.key === 'Escape') {
+          done.current = true;
+          onCancel();
+        }
+      }}
+      onBlur={commit}
+      onClick={(e) => e.stopPropagation()}
+      className={'min-w-0 text-xs border border-gray-900 rounded px-2 py-1 bg-white outline-none ' + className}
+    />
+  );
+}
+
 function CloudLibrary({ kind, title, getCurrent, onOpen, currentId, setCurrentId, onClose, localImport }) {
   const [code, setCode] = useState(loadTeamCode);
   const [codeInput, setCodeInput] = useState('');
@@ -4514,6 +5279,11 @@ function CloudLibrary({ kind, title, getCurrent, onOpen, currentId, setCurrentId
   const [error, setError] = useState('');
   const cur = getCurrent();
   const [saveName, setSaveName] = useState(cur.name);
+  // inline editing: { type: 'newFolder' | 'folder' | 'item', id }
+  const [editing, setEditing] = useState(null);
+  // in-app confirm box: { text, yes, onYes }
+  const [ask, setAsk] = useState(null);
+  const [notice, setNotice] = useState('');
 
   const fail = (e) => {
     if (e.badCode) {
@@ -4599,33 +5369,43 @@ function CloudLibrary({ kind, title, getCurrent, onOpen, currentId, setCurrentId
     }
     setBusy(false);
   };
-  const newFolder = async () => {
-    const name = window.prompt(tr('Folder name'), '');
-    if (!name || !name.trim()) return;
-    const r = await run('booth_save_folder', { p_folder: { kind, name: name.trim(), parent_id: folderId } });
+  const newFolder = () => setEditing({ type: 'newFolder' });
+  const createFolder = async (name) => {
+    setEditing(null);
+    const r = await run('booth_save_folder', { p_folder: { kind, name, parent_id: folderId } });
     if (r) setSel(r.id);
   };
-  const renameFolder = async (f) => {
-    const name = window.prompt(tr('Folder name'), f.name);
-    if (name && name.trim()) await run('booth_save_folder', { p_folder: { id: f.id, name: name.trim() } });
+  const renameFolder = (f) => setEditing({ type: 'folder', id: f.id });
+  const saveFolderName = async (f, name) => {
+    setEditing(null);
+    await run('booth_save_folder', { p_folder: { id: f.id, name } });
   };
-  const deleteFolder = async (f) => {
-    if (!window.confirm(tr('Delete this folder? What is inside moves up one level.'))) return;
-    await run('booth_delete_folder', { p_id: f.id });
-    setSel('all');
-  };
-  const renameItem = async (it) => {
-    const name = window.prompt(tr('Name'), it.name);
-    if (name && name.trim()) await run('booth_save_item', { p_item: { id: it.id, name: name.trim() } });
+  const deleteFolder = (f) =>
+    setAsk({
+      text: `“${f.name}” ` + tr('Delete this folder? What is inside moves up one level.'),
+      yes: tr('Delete'),
+      onYes: async () => {
+        await run('booth_delete_folder', { p_id: f.id });
+        setSel('all');
+      },
+    });
+  const renameItem = (it) => setEditing({ type: 'item', id: it.id });
+  const saveItemName = async (it, name) => {
+    setEditing(null);
+    await run('booth_save_item', { p_item: { id: it.id, name } });
   };
   const moveItem = async (it, fid) => {
     await run('booth_save_item', { p_item: { id: it.id, folder_id: fid || '' } });
   };
-  const deleteItem = async (it) => {
-    if (!window.confirm(tr('Delete') + ` "${it.name}"?`)) return;
-    await run('booth_delete_item', { p_id: it.id });
-    if (it.id === currentId) setCurrentId(null);
-  };
+  const deleteItem = (it) =>
+    setAsk({
+      text: `“${it.name}” ` + tr('will be deleted for everyone on the team.'),
+      yes: tr('Delete'),
+      onYes: async () => {
+        await run('booth_delete_item', { p_id: it.id });
+        if (it.id === currentId) setCurrentId(null);
+      },
+    });
   const importLocal = async () => {
     if (!localImport) return;
     setBusy(true);
@@ -4637,7 +5417,7 @@ function CloudLibrary({ kind, title, getCurrent, onOpen, currentId, setCurrentId
       }
       localImport.done();
       await refresh();
-      window.alert(`${n} ${tr('designs uploaded.')}`);
+      setNotice(`${n} ${tr('designs uploaded.')}`);
     } catch (e) {
       fail(e);
       setBusy(false);
@@ -4663,10 +5443,33 @@ function CloudLibrary({ kind, title, getCurrent, onOpen, currentId, setCurrentId
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.25)' }} onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        className="relative bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden"
         style={{ width: 'min(960px, 94vw)', height: 'min(640px, 90vh)' }}
         onClick={(e) => e.stopPropagation()}
       >
+        {ask && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.7)' }}>
+            <div className="bg-white rounded-lg shadow-xl border p-4 w-80" style={{ borderColor: UI_LINE }}>
+              <div className="text-sm text-gray-800 mb-4 leading-relaxed">{ask.text}</div>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setAsk(null)} className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:border-gray-400">
+                  {tr('Cancel')}
+                </button>
+                <button
+                  autoFocus
+                  onClick={() => {
+                    const a = ask;
+                    setAsk(null);
+                    a.onYes();
+                  }}
+                  className="text-xs font-medium px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700"
+                >
+                  {ask.yes}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex-none flex items-center gap-2 px-4 h-12 border-b" style={{ borderColor: UI_LINE }}>
           <FolderOpen className="w-4 h-4 text-gray-600" />
           <span className="text-sm font-semibold">{title}</span>
@@ -4733,15 +5536,51 @@ function CloudLibrary({ kind, title, getCurrent, onOpen, currentId, setCurrentId
                   {tr('No folder')} <span className="opacity-60">{items.filter((it) => !it.folder_id).length}</span>
                 </button>
                 <div className="my-2 border-t" style={{ borderColor: UI_LINE }} />
-                {flat.map(({ f, depth }) => (
-                  <div key={f.id} className="group flex items-center" style={{ paddingLeft: depth * 14 }}>
-                    <button onClick={() => setSel(f.id)} className={rowCls(sel === f.id) + ' flex-1 min-w-0'}>
-                      <FolderOpen className="w-3.5 h-3.5 flex-none" />
-                      <span className="truncate">{f.name}</span>
-                      <span className="opacity-60">{items.filter((it) => it.folder_id === f.id).length}</span>
-                    </button>
-                  </div>
-                ))}
+                {(() => {
+                  const newRow = (depth) => (
+                    <div key="new" className="flex items-center gap-1.5 py-0.5" style={{ paddingLeft: depth * 14 + 8 }}>
+                      <FolderOpen className="w-3.5 h-3.5 flex-none text-gray-500" />
+                      <InlineName
+                        placeholder={tr('Folder name')}
+                        onCommit={createFolder}
+                        onCancel={() => setEditing(null)}
+                        className="flex-1"
+                      />
+                    </div>
+                  );
+                  const rows = [];
+                  const addingNew = editing && editing.type === 'newFolder';
+                  if (addingNew && !folderId) rows.push(newRow(0));
+                  flat.forEach(({ f, depth }) => {
+                    rows.push(
+                      <div key={f.id} className="group flex items-center" style={{ paddingLeft: depth * 14 }}>
+                        {editing && editing.type === 'folder' && editing.id === f.id ? (
+                          <div className="flex-1 flex items-center gap-1.5 px-2 py-0.5">
+                            <FolderOpen className="w-3.5 h-3.5 flex-none text-gray-500" />
+                            <InlineName
+                              initial={f.name}
+                              onCommit={(n) => saveFolderName(f, n)}
+                              onCancel={() => setEditing(null)}
+                              className="flex-1"
+                            />
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setSel(f.id)}
+                            onDoubleClick={() => renameFolder(f)}
+                            className={rowCls(sel === f.id) + ' flex-1 min-w-0'}
+                          >
+                            <FolderOpen className="w-3.5 h-3.5 flex-none" />
+                            <span className="truncate">{f.name}</span>
+                            <span className="opacity-60">{items.filter((it) => it.folder_id === f.id).length}</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                    if (addingNew && folderId === f.id) rows.push(newRow(depth + 1));
+                  });
+                  return rows;
+                })()}
                 <button onClick={newFolder} className="w-full mt-2 text-xs px-2 py-1.5 rounded border border-dashed border-gray-300 text-gray-600 hover:bg-white">
                   + {folderId ? tr('New folder inside') : tr('New folder')}
                 </button>
@@ -4765,6 +5604,14 @@ function CloudLibrary({ kind, title, getCurrent, onOpen, currentId, setCurrentId
               {/* items */}
               <div className="flex-1 overflow-y-auto p-3">
                 {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
+                {notice && (
+                  <div className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1.5 mb-2 flex items-center">
+                    <span className="flex-1">{notice}</span>
+                    <button onClick={() => setNotice('')} className="p-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
                 {shown.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-xs text-gray-400">{tr('Nothing saved here yet.')}</div>
                 ) : (
@@ -4779,7 +5626,18 @@ function CloudLibrary({ kind, title, getCurrent, onOpen, currentId, setCurrentId
                           )}
                         </button>
                         <div className="p-2">
-                          <div className="text-xs font-medium text-gray-900 truncate">{it.name}</div>
+                          {editing && editing.type === 'item' && editing.id === it.id ? (
+                            <InlineName
+                              initial={it.name}
+                              onCommit={(n) => saveItemName(it, n)}
+                              onCancel={() => setEditing(null)}
+                              className="w-full"
+                            />
+                          ) : (
+                            <div className="text-xs font-medium text-gray-900 truncate" onDoubleClick={() => renameItem(it)}>
+                              {it.name}
+                            </div>
+                          )}
                           <div className="text-[11px] text-gray-400">{new Date(it.updated_at).toLocaleString()}</div>
                           <div className="flex items-center gap-1 mt-1.5">
                             <button onClick={() => open(it)} className="text-[11px] px-1.5 py-0.5 rounded bg-gray-900 text-white">
@@ -4946,6 +5804,9 @@ function BoothSimulator() {
   // shared library: which saved item the current work came from
   const [cloudId, setCloudId] = useState(null);
   const [showCloud, setShowCloud] = useState(false);
+  // buyer app: the shared list and the buyer (folder) being worked on
+  const buyerLib = useCloudList('buyer', BUYER_MODE);
+  const [buyerFolder, setBuyerFolder] = useState(null);
   // saved designs library (persisted in localStorage)
   const [savedDesigns, setSavedDesigns] = useState([]);
   const [showLibrary, setShowLibrary] = useState(false);
@@ -5544,7 +6405,7 @@ function BoothSimulator() {
     const p = productsRef.current.find((q) => q.instanceId === id);
     if (!p) return null;
     const tpl = PRODUCT_LIBRARY.find((t) => t.id === p.productId);
-    if (!tpl || tpl.brand !== 'HOMEDANT HOUSE' || !HH_LEVEL_TYPES.includes(tpl.type)) return null;
+    if (!tpl || !isLevelProduct(tpl) || !HH_LEVEL_TYPES.includes(tpl.type)) return null;
     return { p, levels: hhResolveLevels(p, p.tier || tpl.defaultTier) };
   };
 
@@ -5885,24 +6746,26 @@ function BoothSimulator() {
     x.font = `${Math.round(24 * k)}px Arial, sans-serif`;
     const tiers = tpl.type === 'open_base' ? buyerBase.tier - 1 : buyerBase.tier;
     const board = buyerBase.boardColor === 'white' ? 'white face up' : 'wood face up';
+    const outer = hhOuterLabel(buyerBase);
     x.fillText(
-      `W ${buyerBase.width} x D ${buyerBase.depth} x H ${buyerBase.height} mm  ·  ${tiers} tiers  ·  Double-sided plywood, ${board}`,
+      `Size ${buyerBase.width} x ${buyerBase.depth} x ${buyerBase.height}  ·  Outer dimensions W x D x H: ${outer.mm} (${outer.inch})`,
       pad,
       y + lh * 2
     );
+    x.fillText(`${tiers} tiers  ·  Double-sided plywood, ${board}`, pad, y + lh * 2.8);
     x.fillStyle = '#888888';
     x.font = `${Math.round(19 * k)}px Arial, sans-serif`;
     x.fillText(
       'Colors are approximate on screen. Final colors are confirmed with a physical sample.  ' +
         new Date().toISOString().slice(0, 10),
       pad,
-      y + lh * 4.4
+      y + lh * 5
     );
 
     // colour swatches in a row under the size line
     const sw = Math.round(30 * k);
     let cx = pad;
-    const cy = y + lh * 3.2;
+    const cy = y + lh * 3.9;
     x.font = `${Math.round(22 * k)}px Arial, sans-serif`;
     buyerColors.forEach((col) => {
       const hex = '#' + frameHexOf(col).toString(16).padStart(6, '0').toUpperCase();
@@ -6025,7 +6888,7 @@ function BoothSimulator() {
   const currentWork = () =>
     BUYER_MODE
       ? {
-          name: `${buyerBase ? buyerBase.name : ''} ${buyerColors.map((c) => colorLabel(c).split(' #')[0]).join(', ')}`.trim(),
+          name: `${buyerBase ? buyerBase.name : ''} · ${buyerColors.map((c) => colorLabel(c).split(' #')[0]).join(', ')}`,
           data: { base: buyerBase, compare: buyerCompare },
           thumbnail: makeThumb(),
         }
@@ -6050,11 +6913,23 @@ function BoothSimulator() {
      library to save it somewhere the first time. Ctrl+S does the same. */
   const saveDesign = async () => {
     const code = loadTeamCode();
+    if (BUYER_MODE && !cloudId && code && buyerLib.authed) {
+      const cur = currentWork();
+      const r = await buyerLib.run('booth_save_item', {
+        p_item: { kind: 'buyer', name: cur.name, folder_id: buyerFolder, data: cur.data, thumbnail: cur.thumbnail },
+      });
+      if (r) {
+        setCloudId(r.id);
+        flashSaved(tr('Saved'));
+        return;
+      }
+    }
     if (cloudId && code) {
       const cur = currentWork();
       try {
         await cloud('booth_save_item', { p_code: code, p_item: { id: cloudId, data: cur.data, thumbnail: cur.thumbnail } });
         flashSaved(tr('Saved'));
+        if (BUYER_MODE) buyerLib.refresh();
         return;
       } catch (e) {
         /* fall through to the library, which shows what went wrong */
@@ -6153,7 +7028,7 @@ function BoothSimulator() {
     : null;
 
   // group products by category for left panel
-  const filteredProducts = PRODUCT_LIBRARY.filter((p) =>
+  const filteredProducts = PRODUCT_LIBRARY.filter((p) => !p.hidden).filter((p) =>
     activeBrand === 'SPEEDRACK'
       ? p.brand === 'SPEEDRACK'
       : activeBrand === 'HOMEDANT HOUSE'
@@ -6213,7 +7088,17 @@ function BoothSimulator() {
             <img src={HOMEDANT_WORDMARK_URL} alt="HOMEDANT" className="h-4" />
           </button>
           <span className="text-gray-300">/</span>
-          <span className="text-sm font-semibold">{tr('Shelf Color Configurator')}</span>
+          {(() => {
+            const folder = buyerFolder ? buyerLib.folders.find((f) => f.id === buyerFolder) : null;
+            const item = cloudId ? buyerLib.items.find((it) => it.id === cloudId) : null;
+            return (
+              <span className="text-sm min-w-0 truncate">
+                <span className={folder ? 'font-semibold' : 'text-gray-500'}>{folder ? folder.name : tr('No buyer selected')}</span>
+                <span className="text-gray-300"> / </span>
+                <span className="text-gray-500">{item ? item.name : tr('New proposal (not saved)')}</span>
+              </span>
+            );
+          })()}
           <span className="flex-1" />
           {[
             ['en', 'EN'],
@@ -6232,12 +7117,6 @@ function BoothSimulator() {
               <Check className="w-3.5 h-3.5" /> {saveStatus}
             </span>
           )}
-          <button
-            onClick={() => setShowCloud(true)}
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 bg-white text-gray-700 hover:border-gray-400"
-          >
-            <FolderOpen className="w-3.5 h-3.5" /> {tr('Buyer folders')}
-          </button>
           <button
             onClick={() => saveDesign()}
             className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 bg-white text-gray-700 hover:border-gray-400"
@@ -6258,26 +7137,35 @@ function BoothSimulator() {
           </button>
         </header>
         <div className="flex-1 flex min-h-0">
-          <aside className="flex-none w-64 border-r overflow-y-auto p-3" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
-            <div className="text-xs text-gray-500 mb-2">{tr('Products')}</div>
-            {BUYER_TEMPLATES.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setBuyerBase((b) => newBuyerProduct(t, b))}
-                className={
-                  'w-full flex items-center gap-2.5 text-left px-2.5 py-2 mb-1.5 rounded-lg border transition ' +
-                  (t.id === buyerBase.productId ? 'bg-white border-gray-900' : 'bg-white border-gray-200 hover:border-gray-400')
+          <aside className="flex-none w-72 border-r overflow-y-auto" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+            <BuyerSidebar
+              lib={buyerLib}
+              folderId={buyerFolder}
+              setFolderId={setBuyerFolder}
+              cloudId={cloudId}
+              productId={buyerBase.productId}
+              onManage={() => setShowCloud(true)}
+              onOpenItem={async (it) => {
+                const full = await buyerLib.get(it.id);
+                if (!full) return;
+                openWork(full);
+                setCloudId(full.id);
+                setBuyerFolder(full.folder_id || null);
+              }}
+              onNewProposal={(fid) => {
+                setCloudId(null);
+                setBuyerFolder(fid || null);
+                setBuyerCompare([]);
+              }}
+              onPickProduct={(t) => {
+                // a different product on a saved proposal starts a new one
+                if (cloudId) {
+                  setCloudId(null);
+                  setBuyerCompare([]);
                 }
-              >
-                <ProductThumb type={t.type} tpl={t} />
-                <span className="min-w-0">
-                  <span className="block text-xs font-medium text-gray-900 truncate">{tr(t.name)}</span>
-                  <span className="block text-[11px] text-gray-500">
-                    {t.defaultSize.width}×{t.defaultSize.depth}×{t.defaultSize.height}mm
-                  </span>
-                </span>
-              </button>
-            ))}
+                setBuyerBase((b) => newBuyerProduct(t, b));
+              }}
+            />
           </aside>
           <main className="flex-1 relative" style={{ backgroundColor: '#e6e6e3' }}>
             <div ref={mountRef} className="absolute inset-0" />
@@ -6313,7 +7201,10 @@ function BoothSimulator() {
             onOpen={openWork}
             currentId={cloudId}
             setCurrentId={setCloudId}
-            onClose={() => setShowCloud(false)}
+            onClose={() => {
+              setShowCloud(false);
+              buyerLib.refresh(loadTeamCode());
+            }}
           />
         )}
       </div>
@@ -6804,7 +7695,7 @@ function PropertyPanel({
   // which tabs this product has: basic is always there
   const [tab, setTab] = useState('basic');
   if (!tpl) return null;
-  const isHH = tpl.brand === 'HOMEDANT HOUSE';
+  const isHH = isLevelProduct(tpl);
   const tabs = [['basic', 'Basic']];
   if (isHH && HH_LEVEL_TYPES.includes(tpl.type)) tabs.push(['levels', 'Levels']);
   if (isHH && HH_ITEM_TYPES.includes(tpl.type)) tabs.push(['items', 'Display']);
@@ -6888,7 +7779,7 @@ function PropertyPanel({
           label={tr('Height')}
           value={product.height}
           options={tpl.sizeOptions.height}
-          onChange={(v) => update({ height: v })}
+          onChange={(v) => update({ height: v, tier: fitTier(tpl, { ...product, height: v }) })}
         />
         {tpl.tierOptions.length > 1 && (
           <Field label={tr('Tier')}>
@@ -6897,7 +7788,7 @@ function PropertyPanel({
               onChange={(e) => update({ tier: parseInt(e.target.value, 10) })}
               className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"
             >
-              {tpl.tierOptions.map((t) => (
+              {tierChoices(tpl, product).map((t) => (
                 <option key={t} value={t}>
                   {tpl.type === 'open_base' ? t - 1 : t}
                   {tr('-Tier')}
@@ -6906,7 +7797,7 @@ function PropertyPanel({
             </select>
           </Field>
         )}
-        {tpl.brand === 'HOMEDANT HOUSE' && tpl.type === 'garment' && product.tier >= 3 && (
+        {isLevelProduct(tpl) && tpl.type === 'garment' && product.tier >= 3 && (
           <Field label={tr('Hanger bars')}>
             <div className="flex gap-1.5">
               {[1, 2].map((n) => (
@@ -7089,7 +7980,7 @@ function PropertyPanel({
         )}
         {current === 'levels' && (
           <>
-      {tpl.brand === 'HOMEDANT HOUSE' && HH_LEVEL_TYPES.includes(tpl.type) && (
+      {isLevelProduct(tpl) && HH_LEVEL_TYPES.includes(tpl.type) && (
         <HHLevelEditor product={product} tpl={tpl} update={update} />
       )}
 
@@ -7098,7 +7989,7 @@ function PropertyPanel({
         )}
         {current === 'items' && (
           <>
-      {tpl.brand === 'HOMEDANT HOUSE' && HH_ITEM_TYPES.includes(tpl.type) && (
+      {isLevelProduct(tpl) && HH_ITEM_TYPES.includes(tpl.type) && (
         <HHItemEditor product={product} tpl={tpl} update={update} />
       )}
 
@@ -7191,11 +8082,21 @@ function BuyerPanel({ base, tpl, setBase, compare, setCompare }) {
       <Section title={tr('Size')}>
         <SizeSelect label={tr('Width')} value={base.width} options={tpl.sizeOptions.width} onChange={(v) => setBase({ width: v })} />
         <SizeSelect label={tr('Depth')} value={base.depth} options={tpl.sizeOptions.depth} onChange={(v) => setBase({ depth: v })} />
-        <SizeSelect label={tr('Height')} value={base.height} options={tpl.sizeOptions.height} onChange={(v) => setBase({ height: v })} />
+        <SizeSelect
+          label={tr('Height')}
+          value={base.height}
+          options={tpl.sizeOptions.height}
+          onChange={(v) => setBase({ height: v, tier: fitTier(tpl, { ...base, height: v }) })}
+        />
+        <div className="text-[11px] text-gray-500 -mt-1 mb-2 leading-snug">
+          {tr('Outer size')}: {hhOuterLabel(base).mm}
+          <br />
+          <span className="text-gray-400">{hhOuterLabel(base).inch}</span>
+        </div>
         {tpl.tierOptions.length > 1 && (
           <Field label={tr('Tiers')}>
-            <div className="flex gap-1.5">
-              {tpl.tierOptions.map((t) => (
+            <div className="flex gap-1">
+              {tierChoices(tpl, base).map((t) => (
                 <button key={t} onClick={() => setBase({ tier: t })} className={btn(base.tier === t)}>
                   {tpl.type === 'open_base' ? t - 1 : t}
                 </button>
@@ -7536,10 +8437,11 @@ function HHItemEditor({ product, tpl, update }) {
 /* Move level i to about `raw` mm: snapped to the slot pitch and kept
    between its neighbours. Returns the new list, or null if unchanged. */
 function hhMoveLevel(product, levels, i, raw) {
-  const min = i === 0 ? HH_LEVEL_MIN : levels[i - 1].h + HH_LEVEL_GAP;
-  const max = i === levels.length - 1 ? product.height : levels[i + 1].h - HH_LEVEL_GAP;
-  let v = HH_LEVEL_MIN + Math.round((raw - HH_LEVEL_MIN) / HH_LEVEL_STEP) * HH_LEVEL_STEP;
-  if (raw >= max - HH_LEVEL_STEP / 2) v = max; // let a level reach its top stop
+  const R = levelRule(product);
+  const min = i === 0 ? R.min : levels[i - 1].h + R.gap;
+  const max = i === levels.length - 1 ? product.height : levels[i + 1].h - R.gap;
+  let v = R.min + Math.round((raw - R.min) / R.step) * R.step;
+  if (raw >= max - R.step / 2) v = max; // let a level reach its top stop
   v = Math.max(min, Math.min(max, v));
   if (v === levels[i].h) return null;
   return levels.map((l, k) => (k === i ? { ...l, h: v } : l));
@@ -7563,10 +8465,12 @@ function HHLevelEditor({ product, tpl, update }) {
       )
     );
   const rows = [];
+  const R = levelRule(product);
+  const styled = specOfProduct(product) === HH; // basic / basket is HOMEDANT HOUSE only
   for (let i = levels.length - 1; i >= first; i--) {
-    const min = i === 0 ? HH_LEVEL_MIN : levels[i - 1].h + HH_LEVEL_GAP;
+    const min = i === 0 ? R.min : levels[i - 1].h + R.gap;
     const max =
-      i === levels.length - 1 ? product.height : levels[i + 1].h - HH_LEVEL_GAP;
+      i === levels.length - 1 ? product.height : levels[i + 1].h - R.gap;
     rows.push(
       <div key={i} className="flex items-center gap-2 mb-2">
         <span className="flex-none w-4 text-xs text-gray-500">{i + 1 - first}</span>
@@ -7583,7 +8487,7 @@ function HHLevelEditor({ product, tpl, update }) {
         <span className="flex-none w-14 text-right text-xs text-gray-700 tabular-nums">
           {levels[i].h} mm
         </span>
-        <button
+        {styled && <button
           onClick={() => toggle(i)}
           className={`flex-none w-14 text-xs py-1 rounded border transition ${
             levels[i].style === 'basket'
@@ -7593,7 +8497,7 @@ function HHLevelEditor({ product, tpl, update }) {
           title={tr('Switch this level between basic and basket')}
         >
           {tr(levels[i].style)}
-        </button>
+        </button>}
       </div>
     );
   }
