@@ -22,6 +22,7 @@ import {
   Maximize2,
   FilePlus,
   Settings,
+  X,
   FolderOpen,
   Footprints,
   Check,
@@ -798,6 +799,54 @@ const mmToInch = (mm) => +(mm / MM_PER_IN).toFixed(1);
    3D MESH BUILDER
    ============================================================ */
 const FRAME_COLORS = { black: 0x2a2a2e, white: 0xffffff };
+/* Frame colours offered in the buyer configurator. The new ones are
+   on-screen proposals, not production colours: the real powder-coat
+   shade is settled with a physical sample.                            */
+const SHELF_COLORS = [
+  ['white', 'White', 0xffffff, 'standard'],
+  ['black', 'Black', 0x2a2a2e, 'standard'],
+  ['oat', 'Oat', 0xdcd4c4, 'new'],
+  ['milktea', 'Milk tea', 0xc8b59b, 'new'],
+  ['sage', 'Sage green', 0xa7b29c, 'new'],
+  ['warmgrey', 'Warm grey', 0x9b9893, 'new'],
+  ['dustyblue', 'Dusty blue', 0x9aaab8, 'new'],
+  ['charcoal', 'Charcoal', 0x4a4c51, 'new'],
+];
+SHELF_COLORS.forEach(([k, , hex]) => {
+  FRAME_COLORS[k] = hex;
+});
+// a colour key from the list above, or a custom '#rrggbb'
+function frameHexOf(key) {
+  if (FRAME_COLORS[key] !== undefined) return FRAME_COLORS[key];
+  if (typeof key === 'string' && /^#[0-9a-f]{6}$/i.test(key)) return parseInt(key.slice(1), 16);
+  return 0x333333;
+}
+function isLightHex(hex) {
+  const r = (hex >> 16) & 255,
+    g = (hex >> 8) & 255,
+    b = hex & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55;
+}
+function colorLabel(key) {
+  const c = SHELF_COLORS.find(([k]) => k === key);
+  const hex = '#' + frameHexOf(key).toString(16).padStart(6, '0').toUpperCase();
+  return c ? `${tr(c[1])} ${hex}` : hex;
+}
+// which app opens: '?buyer' goes straight to the buyer configurator (the
+// link sent to buyers), '?booth' to the booth planner, nothing to the start
+// screen where our team picks one
+const APP_MODE =
+  typeof window === 'undefined'
+    ? 'booth'
+    : /[?&]buyer\b/.test(window.location.search)
+    ? 'buyer'
+    : /[?&]booth\b/.test(window.location.search)
+    ? 'booth'
+    : null;
+const BUYER_MODE = APP_MODE === 'buyer';
+const openApp = (mode) => {
+  window.location.search = mode ? '?' + mode : '';
+};
 const BOARD_COLORS = { wood: 0xc8a877, white: 0xffffff, black: 0x222222 };
 // The scene lights add up to about 1.46x on faces that point straight up,
 // which washed the old boards out to pale yellow. Up-facing board faces
@@ -1175,6 +1224,43 @@ const KO = {
   "The washing machine does not fit. Use a width of 700 or more and raise the lowest level.": "세탁기가 들어가지 않습니다. 폭을 700 이상으로 하고 가장 아래 단을 올려주세요.",
   "Laptop": "노트북",
   "Booth Staff": "부스 직원",
+  "Shelf simulator": "선반 시뮬레이터",
+  "Trade show booth planner": "전시회 부스 시뮬레이터",
+  "Lay out a booth for an overseas trade show: products, display items, staff and visitors.": "해외 전시회 부스를 꾸밉니다. 제품 배치, 진열 소품, 직원과 관람객까지.",
+  "For our team": "사내용",
+  "Buyer proposal configurator": "바이어 제안 시뮬레이터",
+  "Set a shelf size and colors, compare colors side by side, and export a proposal image for a buyer.": "선반 사이즈와 컬러를 정하고 컬러를 나란히 비교한 뒤, 바이어에게 보낼 제안 이미지로 내보냅니다.",
+  "For our team: buyer proposals": "사내용 · 바이어 제안",
+  "Export proposal image": "제안 이미지 내보내기",
+  "Save screen": "화면 저장",
+  "Back to start": "처음 화면으로",
+  "Shelf Color Configurator": "선반 컬러 시뮬레이터",
+  "Save image": "이미지 저장",
+  "Products": "제품",
+  "Tiers": "단수",
+  "Frame color": "프레임 컬러",
+  "Standard": "기본 컬러",
+  "New color proposals": "신규 컬러 제안",
+  "Custom color": "직접 지정",
+  "Selected": "선택",
+  "Plywood board": "합판",
+  "Wood face up": "우드 면 위로",
+  "White face up": "화이트 면 위로",
+  "Steel (frame color)": "스틸 (프레임 색)",
+  "Wood": "우드",
+  "Compare colors": "컬러 비교",
+  "Add 2 to 4 colors to see them side by side.": "2~4개 컬러를 담으면 나란히 비교해서 보여줍니다.",
+  "Add selected color": "선택한 컬러 담기",
+  "Clear": "비우기",
+  "Colors on screen are approximate. Final colors are confirmed with a physical sample.": "화면 색상은 근사치입니다. 최종 색상은 실물 샘플로 확정합니다.",
+  "Oat": "오트",
+  "White": "화이트",
+  "Black": "블랙",
+  "Milk tea": "밀크티",
+  "Sage green": "세이지 그린",
+  "Warm grey": "웜 그레이",
+  "Dusty blue": "더스티 블루",
+  "Charcoal": "차콜",
   "Basic": "기본",
   "Levels": "단",
   "Display": "진열",
@@ -1277,6 +1363,16 @@ const BOOTH_LOOKS = {
     carpet: true,
     aisle: 0x55575b,
     sign: true,
+  },
+  studio: {
+    label: 'Studio',
+    hint: 'Plain floor, no booth',
+    background: 0xefefec,
+    floor: 0xa9a9a6, // lands near the background tone once lit
+    grid: false,
+    carpet: false,
+    aisle: null,
+    sign: false,
   },
   dark: {
     label: 'Dark hall',
@@ -1827,9 +1923,10 @@ function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style, p
    If perforated, a separate `postMat` is returned with a clone of the
    slot texture so its UV repeat can be set per post-height in addPosts. */
 function makeMaterials(p, opts = {}) {
-  const frameHex = FRAME_COLORS[p.frameColor] || 0x333333;
+  const frameHex = frameHexOf(p.frameColor);
   const boardHex = BOARD_COLORS[p.boardColor] || 0xb89968;
-  const isWhiteFrame = p.frameColor === 'white';
+  // light paint colours (white, oat...) get the matte white-paint finish
+  const isWhiteFrame = p.frameColor === 'white' || isLightHex(frameHex);
   const isWhiteBoard = p.boardColor === 'white';
 
   // White paint: low metalness + higher roughness so directional light
@@ -1885,6 +1982,16 @@ function makeMaterials(p, opts = {}) {
       woodUp ? woodSide : whiteSide, // +z (front edge)
       woodUp ? whiteSide : woodSide, // -z (back edge)
     ];
+  }
+  // painted steel deck in the frame colour; the up face is toned down
+  // like the wooden boards so it doesn't wash out under the top light
+  if (p.boardColor === 'steel') {
+    board.color.setHex(frameHex);
+    board.metalness = isWhiteFrame ? 0.08 : 0.3;
+    board.roughness = 0.6;
+    const top = board.clone();
+    top.color.setHex(frameHex).multiplyScalar(0.72);
+    board.userData.faceMats = [board, board, top, board, board, board];
   }
   const foot = new THREE.MeshStandardMaterial({
     // Cap color matches frame: white frame → white cap, black frame → black cap.
@@ -4298,9 +4405,88 @@ function buildProductMesh(p, tpl) {
 /* ============================================================
    MAIN COMPONENT
    ============================================================ */
-export default function BoothSimulator() {
+/* Start screen: pick the booth planner or the buyer configurator. */
+function StartScreen() {
+  const [lang, setLangState] = useState(loadLang);
+  _lang = lang;
+  const setLang = (l) => {
+    setLangState(l);
+    try {
+      window.localStorage.setItem('hbs-lang', l);
+    } catch (e) {
+      /* storage unavailable */
+    }
+  };
+  const cards = [
+    {
+      mode: 'booth',
+      icon: <Layers className="w-6 h-6" />,
+      title: 'Trade show booth planner',
+      body: 'Lay out a booth for an overseas trade show: products, display items, staff and visitors.',
+      who: 'For our team',
+    },
+    {
+      mode: 'buyer',
+      icon: <Box className="w-6 h-6" />,
+      title: 'Buyer proposal configurator',
+      body: 'Set a shelf size and colors, compare colors side by side, and export a proposal image for a buyer.',
+      who: 'For our team: buyer proposals',
+    },
+  ];
+  return (
+    <div
+      className="h-screen w-screen flex flex-col items-center justify-center text-gray-900"
+      style={{ backgroundColor: UI_PANEL, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }}
+    >
+      <div className="absolute top-4 right-4 flex gap-1">
+        {[
+          ['en', 'EN'],
+          ['ko', '한국어'],
+        ].map(([code, name]) => (
+          <button
+            key={code}
+            onClick={() => setLang(code)}
+            className={'text-xs px-2 py-1 rounded ' + (lang === code ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-white')}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <img src={HOMEDANT_WORDMARK_URL} alt="HOMEDANT" className="h-7 mb-3" />
+      <div className="text-sm text-gray-500 mb-10">{tr('Shelf simulator')}</div>
+      <div className="flex gap-5">
+        {cards.map((c) => (
+          <button
+            key={c.mode}
+            onClick={() => openApp(c.mode)}
+            className="w-80 text-left bg-white border border-gray-200 rounded-xl p-6 hover:border-gray-900 hover:shadow-md transition"
+          >
+            <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center text-gray-800 mb-4">{c.icon}</div>
+            <div className="text-base font-semibold mb-1.5">{tr(c.title)}</div>
+            <div className="text-sm text-gray-600 leading-relaxed mb-4">{tr(c.body)}</div>
+            <div className="text-xs text-gray-400">{tr(c.who)}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function SimulatorApp() {
+  if (!APP_MODE) return <StartScreen />;
+  return <BoothSimulator />;
+}
+
+function BoothSimulator() {
   // ----- state -----
-  const [booth, setBooth] = useState({
+  const [booth, setBooth] = useState(BUYER_MODE ? {
+    width: 30000,
+    depth: 30000,
+    wallHeight: 2438,
+    unit: 'mm',
+    style: 'studio',
+    look: 'studio',
+  } : {
     width: 3048, // 10ft in mm  (10ft x 10ft default)
     depth: 3048, // 10ft in mm
     wallHeight: 2438, // 8ft in mm
@@ -4339,6 +4525,9 @@ export default function BoothSimulator() {
   // current layout name (used in exported PNG filenames)
   const [layoutName, setLayoutName] = useState('layout1');
   const [openMenu, setOpenMenu] = useState(null); // header menus and booth settings
+  // buyer configurator: one product, optionally shown in several colours
+  const [buyerBase, setBuyerBase] = useState(() => (BUYER_MODE ? newBuyerProduct(BUYER_TEMPLATES[0]) : null));
+  const [buyerCompare, setBuyerCompare] = useState([]);
   // saved designs library (persisted in localStorage)
   const [savedDesigns, setSavedDesigns] = useState([]);
   const [showLibrary, setShowLibrary] = useState(false);
@@ -4499,7 +4688,8 @@ export default function BoothSimulator() {
     // keep the shadow area matched to the current booth size
     const keyLight =
       sceneRef.current && sceneRef.current.getObjectByName('keyLight');
-    if (keyLight) fitShadowToBooth(keyLight, w, d, wh);
+    // (the studio floor is huge, but its products stand in the middle)
+    if (keyLight) fitShadowToBooth(keyLight, booth.style === 'studio' ? 7 : w, booth.style === 'studio' ? 5 : d, wh);
 
     // floor
     const floorGeo = new THREE.PlaneGeometry(w, d);
@@ -4540,7 +4730,9 @@ export default function BoothSimulator() {
       group.add(aisle);
     }
 
-    if (booth.style === 'curtain') {
+    if (booth.style === 'studio') {
+      // buyer configurator: products on a plain floor, no booth walls
+    } else if (booth.style === 'curtain') {
       // ---- CURTAIN BOOTH (pipe & drape) ----
       // Matches a real inline curtain booth: a TALL back curtain (full
       // wall height) and SHORT side curtains (~3ft vs 8ft = ~0.375 of
@@ -4756,7 +4948,7 @@ export default function BoothSimulator() {
       const tpl = PRODUCT_LIBRARY.find((t) => t.id === p.productId);
       if (!tpl) return;
       let mesh = map.get(p.instanceId);
-      const fingerprint = `${p.width}-${p.depth}-${p.height}-${p.tier}-${p.frameColor}-${p.boardColor}-${p.shelfStyle || 'basic'}-${p.levelsKey || ''}-${
+      const fingerprint = `${p.caption || ''}-${p.width}-${p.depth}-${p.height}-${p.tier}-${p.frameColor}-${p.boardColor}-${p.shelfStyle || 'basic'}-${p.levelsKey || ''}-${
         Array.isArray(p.levels)
           ? p.levels.map((l) => `${l.h}${l.style}`).join('.')
           : ''
@@ -4771,6 +4963,11 @@ export default function BoothSimulator() {
           disposeGroup(mesh);
         }
         mesh = buildProductMesh(p, tpl);
+        if (p.caption) {
+          const cap = makeSpeechBubble(p.caption, 0.55);
+          cap.position.set(0, (p.height * MM_TO_M) + 0.12, 0);
+          mesh.add(cap);
+        }
         mesh.userData.instanceId = p.instanceId;
         mesh.userData.fingerprint = fingerprint;
         // tag children for picking
@@ -4945,6 +5142,7 @@ export default function BoothSimulator() {
 
   const onCanvasMouseDown = (e) => {
     if (e.button !== 0) return; // only left click for products
+    if (BUYER_MODE) return;
     // grabbing a level of the shelf that is already selected moves that
     // level up and down instead of moving the shelf
     if (viewMode !== 'top' && selectedId) {
@@ -5218,6 +5416,98 @@ export default function BoothSimulator() {
     a.click();
   };
 
+  /* ---------- buyer proposal image ----------
+     The current 3D view at twice the screen resolution, with a band
+     underneath: product, size, board, and each colour with its swatch
+     and HEX code. Always in English: it goes to overseas buyers.       */
+  const exportProposal = async (tpl) => {
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    if (!renderer || !scene || !camera || !buyerBase || !tpl) return;
+    const prevRatio = renderer.getPixelRatio();
+    renderer.setPixelRatio(2);
+    renderer.render(scene, camera);
+    const shot = new Image();
+    shot.src = renderer.domElement.toDataURL('image/png');
+    renderer.setPixelRatio(prevRatio);
+    renderer.render(scene, camera);
+    const logo = new Image();
+    logo.src = HOMEDANT_WORDMARK_URL;
+    await Promise.all([shot, logo].map((im) => (im.complete ? Promise.resolve() : new Promise((r) => (im.onload = im.onerror = r)))));
+
+    const W = shot.width;
+    const k = W / 1600; // scale for text and spacing
+    const band = Math.round(300 * k);
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = shot.height + band;
+    const x = c.getContext('2d');
+    x.fillStyle = '#ffffff';
+    x.fillRect(0, 0, c.width, c.height);
+    x.drawImage(shot, 0, 0);
+    x.fillStyle = '#e3e3df';
+    x.fillRect(0, shot.height, W, Math.max(1, Math.round(2 * k)));
+
+    const pad = Math.round(56 * k);
+    let y = shot.height + Math.round(56 * k);
+    const lh = Math.round(44 * k);
+    if (logo.width) x.drawImage(logo, pad, y - Math.round(26 * k), Math.round(26 * k * HOMEDANT_WORDMARK_ASPECT), Math.round(26 * k));
+    x.textBaseline = 'middle';
+    x.fillStyle = '#111111';
+    x.font = `600 ${Math.round(34 * k)}px Arial, sans-serif`;
+    const name = tpl.name.replace(/^House /, 'HOMEDANT HOUSE ');
+    x.fillText(name, pad, y + lh);
+    x.fillStyle = '#555555';
+    x.font = `${Math.round(24 * k)}px Arial, sans-serif`;
+    const tiers = tpl.type === 'open_base' ? buyerBase.tier - 1 : buyerBase.tier;
+    const board = buyerBase.boardColor === 'white' ? 'white face up' : 'wood face up';
+    x.fillText(
+      `W ${buyerBase.width} x D ${buyerBase.depth} x H ${buyerBase.height} mm  ·  ${tiers} tiers  ·  Double-sided plywood, ${board}`,
+      pad,
+      y + lh * 2
+    );
+    x.fillStyle = '#888888';
+    x.font = `${Math.round(19 * k)}px Arial, sans-serif`;
+    x.fillText(
+      'Colors are approximate on screen. Final colors are confirmed with a physical sample.  ' +
+        new Date().toISOString().slice(0, 10),
+      pad,
+      y + lh * 3.2
+    );
+
+    // colour swatches on the right
+    const sw = Math.round(30 * k);
+    let cx = W / 2 + Math.round(60 * k);
+    let cy = y + lh * 0.9;
+    x.font = `${Math.round(22 * k)}px Arial, sans-serif`;
+    buyerColors.forEach((col, i) => {
+      if (i === 2) {
+        cx = W / 2 + Math.round(60 * k);
+        cy += lh * 1.25;
+      }
+      const hex = '#' + frameHexOf(col).toString(16).padStart(6, '0').toUpperCase();
+      const known = SHELF_COLORS.find(([kk]) => kk === col);
+      x.fillStyle = hex;
+      x.beginPath();
+      x.arc(cx + sw / 2, cy, sw / 2, 0, Math.PI * 2);
+      x.fill();
+      x.strokeStyle = '#cccccc';
+      x.lineWidth = Math.max(1, k);
+      x.stroke();
+      x.fillStyle = '#222222';
+      const label = (known ? known[1] + '  ' : '') + hex;
+      x.fillText(label, cx + sw + Math.round(14 * k), cy);
+      cx += Math.round(330 * k);
+    });
+
+    const a = document.createElement('a');
+    a.href = c.toDataURL('image/png');
+    const colorPart = buyerColors.map((col) => (SHELF_COLORS.find(([kk]) => kk === col) || [col.replace('#', '')])[0]).join('-');
+    a.download = `HOMEDANT_${tpl.name.replace(/\s+/g, '')}_${buyerBase.width}x${buyerBase.depth}x${buyerBase.height}_${colorPart}.png`;
+    a.click();
+  };
+
   /* ---------- Export Booth Images: front / top / 45° ---------- */
   const exportBoothImages = () => {
     const renderer = rendererRef.current;
@@ -5471,9 +5761,136 @@ export default function BoothSimulator() {
       : p.brand === 'Exhibition'
   );
 
+  /* ---------- buyer configurator: what is on the floor ---------- */
+  const buyerColors = buyerBase
+    ? buyerCompare.length >= 2
+      ? buyerCompare
+      : [buyerBase.frameColor]
+    : [];
+  useEffect(() => {
+    if (!BUYER_MODE || !buyerBase) return;
+    const n = buyerColors.length;
+    const step = buyerBase.width * MM_TO_M + 0.45;
+    setProducts(
+      buyerColors.map((c, i) => ({
+        ...buyerBase,
+        instanceId: 'b' + i,
+        frameColor: c,
+        caption: n > 1 ? colorLabel(c) : '',
+        position: { x: (i - (n - 1) / 2) * step, z: 0 },
+        rotation: 0,
+      }))
+    );
+    setSelectedId(null);
+  }, [buyerBase, buyerCompare, lang]);
+  // frame the camera on the product(s) when what is shown changes size
+  useEffect(() => {
+    if (!BUYER_MODE || !buyerBase || !controlsRef.current) return;
+    const n = buyerColors.length;
+    const totalW = n * (buyerBase.width * MM_TO_M + 0.45);
+    const h = buyerBase.height * MM_TO_M;
+    controlsRef.current.target.set(0, h * 0.46, 0);
+    // a product-photo angle: a little above eye level, turned a bit
+    controlsRef.current.setView(
+      viewMode,
+      Math.max(totalW * 1.15, h * 1.55) + 0.6,
+      viewMode === 'front' ? { phi: Math.PI / 2 - 0.06, theta: 0 } : { phi: 1.22, theta: n > 1 ? 0.32 : 0.55 }
+    );
+  }, [buyerBase && buyerBase.productId, buyerBase && buyerBase.width, buyerBase && buyerBase.height, buyerColors.length, viewMode]);
+
   /* ============================================================
      RENDER
      ============================================================ */
+  if (BUYER_MODE && buyerBase) {
+    const tpl = PRODUCT_LIBRARY.find((t) => t.id === buyerBase.productId);
+    return (
+      <div
+        className="h-screen w-screen flex flex-col text-gray-900 overflow-hidden"
+        style={{ fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }}
+      >
+        <header className="flex-none border-b h-12 px-4 flex items-center gap-3" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+          <button onClick={() => openApp(null)} title={tr('Back to start')}>
+            <img src={HOMEDANT_WORDMARK_URL} alt="HOMEDANT" className="h-4" />
+          </button>
+          <span className="text-gray-300">/</span>
+          <span className="text-sm font-semibold">{tr('Shelf Color Configurator')}</span>
+          <span className="flex-1" />
+          {[
+            ['en', 'EN'],
+            ['ko', '한국어'],
+          ].map(([code, name]) => (
+            <button
+              key={code}
+              onClick={() => setLang(code)}
+              className={'text-xs px-2 py-1 rounded ' + (lang === code ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-white')}
+            >
+              {name}
+            </button>
+          ))}
+          <button
+            onClick={savePNG}
+            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 bg-white text-gray-700 hover:border-gray-400"
+          >
+            <Camera className="w-3.5 h-3.5" /> {tr('Save screen')}
+          </button>
+          <button
+            onClick={() => exportProposal(tpl)}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-700"
+          >
+            <Download className="w-3.5 h-3.5" /> {tr('Export proposal image')}
+          </button>
+        </header>
+        <div className="flex-1 flex min-h-0">
+          <aside className="flex-none w-64 border-r overflow-y-auto p-3" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+            <div className="text-xs text-gray-500 mb-2">{tr('Products')}</div>
+            {BUYER_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setBuyerBase((b) => newBuyerProduct(t, b))}
+                className={
+                  'w-full flex items-center gap-2.5 text-left px-2.5 py-2 mb-1.5 rounded-lg border transition ' +
+                  (t.id === buyerBase.productId ? 'bg-white border-gray-900' : 'bg-white border-gray-200 hover:border-gray-400')
+                }
+              >
+                <ProductThumb type={t.type} tpl={t} />
+                <span className="min-w-0">
+                  <span className="block text-xs font-medium text-gray-900 truncate">{tr(t.name)}</span>
+                  <span className="block text-[11px] text-gray-500">
+                    {t.defaultSize.width}×{t.defaultSize.depth}×{t.defaultSize.height}mm
+                  </span>
+                </span>
+              </button>
+            ))}
+          </aside>
+          <main className="flex-1 relative" style={{ backgroundColor: '#ebebe8' }}>
+            <div ref={mountRef} className="absolute inset-0" />
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
+              {[
+                ['3d', '3D'],
+                ['front', 'Front'],
+              ].map(([m, label]) => (
+                <ToolBtn key={m} active={viewMode === m} onClick={() => setViewMode(m)}>
+                  {tr(label)}
+                </ToolBtn>
+              ))}
+            </div>
+            <div className="absolute bottom-3 left-3 text-[11px] text-gray-500 pointer-events-none">
+              {tr('L-Drag')} {tr('rotate')} · {tr('R-Drag')} {tr('pan')} · {tr('Wheel')} {tr('zoom')}
+            </div>
+          </main>
+          <aside className="flex-none w-80 border-l overflow-y-auto" style={{ backgroundColor: UI_PANEL, borderColor: UI_LINE }}>
+            <BuyerPanel
+              base={buyerBase}
+              tpl={tpl}
+              setBase={(patch) => setBuyerBase((b) => ({ ...b, ...patch }))}
+              compare={buyerCompare}
+              setCompare={setBuyerCompare}
+            />
+          </aside>
+        </div>
+      </div>
+    );
+  }
   return (
     <div
       className="h-screen w-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden"
@@ -5487,7 +5904,9 @@ export default function BoothSimulator() {
       >
         <div className="px-4 h-12 grid items-center" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
           <div className="flex items-center gap-2 min-w-0">
-            <img src={HOMEDANT_WORDMARK_URL} alt="HOMEDANT" className="h-4 flex-none" />
+            <button onClick={() => openApp(null)} title={tr('Back to start')} className="flex-none">
+              <img src={HOMEDANT_WORDMARK_URL} alt="HOMEDANT" className="h-4" />
+            </button>
             <span className="text-gray-300">/</span>
             <input
               type="text"
@@ -5826,7 +6245,7 @@ export default function BoothSimulator() {
               </ToolBtn>
             ))}
             <div className="w-px h-5 bg-gray-200 mx-1" />
-            {Object.entries(BOOTH_LOOKS).map(([key, lk]) => (
+            {Object.entries(BOOTH_LOOKS).filter(([key]) => key !== 'studio').map(([key, lk]) => (
               <ToolBtn key={key} active={(booth.look || DEFAULT_LOOK) === key} onClick={() => setBoothLook(key)} title={tr(lk.hint)}>
                 {tr(lk.label)}
               </ToolBtn>
@@ -6370,6 +6789,152 @@ function NumInput({ label, valueMM, unit, onChange }) {
         className="w-16 text-xs border border-gray-300 rounded px-1.5 py-1 bg-white"
       />
     </label>
+  );
+}
+
+const BUYER_TEMPLATES = PRODUCT_LIBRARY.filter(
+  (t) => t.brand === 'HOMEDANT HOUSE' && t.type !== 'cabinet'
+);
+// a fresh product for the buyer view; keeps the colours already chosen
+function newBuyerProduct(tpl, keep) {
+  const boards = tpl.boardColors;
+  return {
+    instanceId: 'b0',
+    productId: tpl.id,
+    name: tpl.name,
+    width: tpl.defaultSize.width,
+    depth: tpl.defaultSize.depth,
+    height: tpl.defaultSize.height,
+    // an ordinary shelf is shown at 4 levels, like the usual buyer photos
+    tier: tpl.type === 'shelf' && tpl.tierOptions.includes(4) ? 4 : tpl.defaultTier,
+    frameColor: keep ? keep.frameColor : 'white',
+    boardColor: keep && boards.includes(keep.boardColor) ? keep.boardColor : tpl.boardColors[0],
+    shelfStyle: keep ? keep.shelfStyle : undefined,
+    position: { x: 0, z: 0 },
+    rotation: 0,
+    addOns: [],
+  };
+}
+
+function BuyerPanel({ base, tpl, setBase, compare, setCompare }) {
+  if (!tpl) return null;
+  const hex = '#' + frameHexOf(base.frameColor).toString(16).padStart(6, '0');
+  const btn = (on) =>
+    'flex-1 text-xs py-1.5 rounded border transition ' +
+    (on ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50');
+  const swatch = ([k, name, h]) => (
+    <button
+      key={k}
+      onClick={() => setBase({ frameColor: k })}
+      title={tr(name)}
+      className={'flex flex-col items-center gap-1 p-1 rounded ' + (base.frameColor === k ? 'bg-white ring-2 ring-gray-900' : 'hover:bg-white')}
+    >
+      <span
+        className="w-9 h-9 rounded-full border border-gray-300"
+        style={{ backgroundColor: '#' + h.toString(16).padStart(6, '0') }}
+      />
+      <span className="text-[11px] text-gray-700 leading-tight text-center">{tr(name)}</span>
+    </button>
+  );
+  const inCompare = compare.includes(base.frameColor);
+  return (
+    <div>
+      <div className="px-4 pt-3 pb-2">
+        <div className="text-[11px] text-gray-500">HOMEDANT HOUSE</div>
+        <div className="font-semibold text-sm">{tr(base.name)}</div>
+      </div>
+      <Section title={tr('Size')}>
+        <SizeSelect label={tr('Width')} value={base.width} options={tpl.sizeOptions.width} onChange={(v) => setBase({ width: v })} />
+        <SizeSelect label={tr('Depth')} value={base.depth} options={tpl.sizeOptions.depth} onChange={(v) => setBase({ depth: v })} />
+        <SizeSelect label={tr('Height')} value={base.height} options={tpl.sizeOptions.height} onChange={(v) => setBase({ height: v })} />
+        {tpl.tierOptions.length > 1 && (
+          <Field label={tr('Tiers')}>
+            <div className="flex gap-1.5">
+              {tpl.tierOptions.map((t) => (
+                <button key={t} onClick={() => setBase({ tier: t })} className={btn(base.tier === t)}>
+                  {tpl.type === 'open_base' ? t - 1 : t}
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
+      </Section>
+      <Section title={tr('Frame color')}>
+        <div className="text-[11px] text-gray-500 mb-1">{tr('Standard')}</div>
+        <div className="grid grid-cols-4 gap-1 mb-2">{SHELF_COLORS.filter((c) => c[3] === 'standard').map(swatch)}</div>
+        <div className="text-[11px] text-gray-500 mb-1">{tr('New color proposals')}</div>
+        <div className="grid grid-cols-4 gap-1 mb-2">{SHELF_COLORS.filter((c) => c[3] === 'new').map(swatch)}</div>
+        <div className="text-[11px] text-gray-500 mb-1">{tr('Custom color')}</div>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={hex}
+            onChange={(e) => setBase({ frameColor: e.target.value.toLowerCase() })}
+            className="w-9 h-8 p-0 border border-gray-300 rounded bg-white cursor-pointer"
+          />
+          <input
+            type="text"
+            value={hex.toUpperCase()}
+            onChange={(e) => {
+              const v = e.target.value.trim();
+              if (/^#[0-9a-f]{6}$/i.test(v)) setBase({ frameColor: v.toLowerCase() });
+            }}
+            className="flex-1 text-xs border border-gray-300 rounded px-2 py-1.5 bg-white font-mono"
+          />
+        </div>
+        <div className="text-xs text-gray-700 mt-2">
+          {tr('Selected')}: <span className="font-medium">{colorLabel(base.frameColor)}</span>
+        </div>
+      </Section>
+      <Section title={tr('Plywood board')}>
+        <div className="flex gap-1.5">
+          {tpl.boardColors.map((b) => (
+            <button key={b} onClick={() => setBase({ boardColor: b })} className={btn(base.boardColor === b)}>
+              {tr(b === 'wood' ? 'Wood face up' : 'White face up')}
+            </button>
+          ))}
+        </div>
+        {HH_LEVEL_TYPES.includes(tpl.type) && (
+          <div className="flex gap-1.5 mt-2">
+            {['basic', 'basket'].map((st) => (
+              <button key={st} onClick={() => setBase({ shelfStyle: st })} className={btn((base.shelfStyle || 'basic') === st)}>
+                {st}
+              </button>
+            ))}
+          </div>
+        )}
+      </Section>
+      <Section title={tr('Compare colors')}>
+        <div className="text-xs text-gray-500 mb-2">{tr('Add 2 to 4 colors to see them side by side.')}</div>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {compare.map((c) => (
+            <span key={c} className="inline-flex items-center gap-1.5 text-xs bg-white border border-gray-300 rounded-full pl-1 pr-2 py-0.5">
+              <span className="w-4 h-4 rounded-full border border-gray-300" style={{ backgroundColor: '#' + frameHexOf(c).toString(16).padStart(6, '0') }} />
+              {colorLabel(c)}
+              <button onClick={() => setCompare(compare.filter((x) => x !== c))} className="text-gray-400 hover:text-gray-900">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => !inCompare && compare.length < 4 && setCompare([...compare, base.frameColor])}
+            className={btn(false) + (inCompare || compare.length >= 4 ? ' opacity-50 cursor-default' : '')}
+          >
+            {tr('Add selected color')}
+          </button>
+          {compare.length > 0 && (
+            <button onClick={() => setCompare([])} className={btn(false)}>
+              {tr('Clear')}
+            </button>
+          )}
+        </div>
+      </Section>
+      <div className="px-4 py-3 text-[11px] text-gray-500 leading-relaxed">
+        {tr('Colors on screen are approximate. Final colors are confirmed with a physical sample.')}
+      </div>
+    </div>
   );
 }
 
@@ -7085,9 +7650,11 @@ function createOrbitControls(camera, dom) {
       camera.position.copy(target).add(off);
       camera.lookAt(target);
     },
-    setView(mode, dist) {
+    setView(mode, dist, angles) {
       const r = dist || spherical.radius;
-      if (mode === 'top') {
+      if (angles) {
+        spherical.set(r, angles.phi, angles.theta);
+      } else if (mode === 'top') {
         spherical.set(r, 0.05, 0);
       } else if (mode === 'front') {
         spherical.set(r, Math.PI / 2 - 0.1, 0);
