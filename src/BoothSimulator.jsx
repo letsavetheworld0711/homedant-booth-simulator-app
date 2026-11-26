@@ -903,6 +903,8 @@ const APP_MODE =
     ? 'buyer'
     : /[?&]booth\b/.test(window.location.search)
     ? 'booth'
+    : /[?&]photo\b/.test(window.location.search)
+    ? 'photo'
     : null;
 const BUYER_MODE = APP_MODE === 'buyer';
 const openApp = (mode) => {
@@ -1134,6 +1136,9 @@ const HOMEDANT_WORDMARK_ASPECT = 6.355; // width / height
    wording in KO below.                                                */
 let _lang = 'en';
 const KO = {
+  'Lifestyle photo (beta)': '라이프스타일 이미지 (베타)',
+  'Put the exact 3D product into a room picture and render it like a photo, for store listings.': '실내 배경 사진에 실제 3D 제품을 그대로 넣어 사진처럼 렌더합니다. 판매 페이지용 이미지에 씁니다.',
+  'For our team: marketing images': '우리 팀용: 마케팅 이미지',
   "Booth Simulator": "부스 시뮬레이터",
   "Booth": "부스",
   "Width": "폭",
@@ -5842,6 +5847,13 @@ function StartScreen() {
       body: 'Set a shelf size and colors, compare colors side by side, and export a proposal image for a buyer.',
       who: 'For our team: buyer proposals',
     },
+    {
+      mode: 'photo',
+      icon: <Box className="w-6 h-6" />,
+      title: 'Lifestyle photo (beta)',
+      body: 'Put the exact 3D product into a room picture and render it like a photo, for store listings.',
+      who: 'For our team: marketing images',
+    },
   ];
   return (
     <div
@@ -5882,10 +5894,31 @@ function StartScreen() {
   );
 }
 
+// lifestyle photo mode: its own screen, loaded only when it is opened
+const PhotoStudio = React.lazy(() => import('./PhotoStudio.jsx'));
 export default function SimulatorApp() {
   if (!APP_MODE) return <StartScreen />;
+  if (APP_MODE === 'photo')
+    return (
+      <React.Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading...</div>}>
+        <PhotoStudio />
+      </React.Suspense>
+    );
   return <BoothSimulator />;
 }
+// shared with the photo mode (PhotoStudio.jsx): the same product builder
+// and product list, so photos always show the real product
+export {
+  buildProductMesh,
+  BUYER_TEMPLATES,
+  BUYER_GROUPS,
+  newBuyerProduct,
+  SHELF_COLORS,
+  buyerBrand,
+  buyerShortName,
+  tierChoices,
+  fitTier,
+};
 
 function BoothSimulator() {
   // ----- state -----
