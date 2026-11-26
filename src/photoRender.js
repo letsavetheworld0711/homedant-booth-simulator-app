@@ -21,8 +21,8 @@ import * as THREE from 'three';
 
 export const QUALITY = {
   draft: { label: 'Draft', keySamples: 1, skySamples: 0, ss: 1, shadowMap: 2048 },
-  standard: { label: 'Standard', keySamples: 10, skySamples: 6, ss: 2, shadowMap: 2048 },
-  photo: { label: 'Photo Realistic', keySamples: 24, skySamples: 16, ss: 2, shadowMap: 4096 },
+  standard: { label: 'Standard', keySamples: 10, skySamples: 14, ss: 2, shadowMap: 2048 },
+  photo: { label: 'Photo Realistic', keySamples: 24, skySamples: 40, ss: 2, shadowMap: 4096 },
 };
 
 /* ---------- camera from the background ----------
@@ -80,9 +80,11 @@ export function analyseBackground(img) {
     right = 0,
     n = 0;
   const top = [0, 0, 0],
-    bot = [0, 0, 0];
+    bot = [0, 0, 0],
+    mid = [0, 0, 0];
   let nt = 0,
-    nb = 0;
+    nb = 0,
+    nm = 0;
   const lums = [];
   for (let yy = 0; yy < H; yy++)
     for (let xx = 0; xx < W; xx++) {
@@ -99,6 +101,12 @@ export function analyseBackground(img) {
         top[1] += d[i + 1];
         top[2] += d[i + 2];
         nt++;
+      }
+      if (yy > H * 0.3 && yy < H * 0.6) {
+        mid[0] += d[i];
+        mid[1] += d[i + 1];
+        mid[2] += d[i + 2];
+        nm++;
       }
       if (yy > H * 0.82) {
         bot[0] += d[i];
@@ -126,10 +134,11 @@ export function analyseBackground(img) {
   const lr = (left - right) / Math.max(1, left + right);
   return {
     // light comes from the brighter side; a small difference means frontal
-    azimuth: Math.max(-70, Math.min(70, -lr * 400)),
+    azimuth: Math.abs(lr) < 0.02 ? -30 : Math.sign(-lr) * Math.min(75, 45 + Math.abs(lr) * 300),
     elevation: 40,
     whiteBalance: [wp[0] / g, 1, wp[2] / g],
     skyColor: avg(top, nt),
+    wallColor: avg(mid, nm),
     groundColor: avg(bot, nb),
     exposure: Math.max(0.75, Math.min(1.1, 0.55 + meanL * 0.6)),
   };
@@ -199,6 +208,66 @@ function photoMaterials(root) {
     o.castShadow = true;
     o.receiveShadow = true;
   });
+}
+
+/* ---------- colour space ----------
+   three r128 has no colour management: by default nothing is converted.
+   Photo mode decodes product colours to linear, renders with sRGB output,
+   reads the picture back (sRGB), and decodes again so that averaging the
+   light samples and darkening the background for shadows happen in linear
+   light, like a camera. Only the final picture is encoded to sRGB.     */
+const S2L = new Float32Array(256);
+for (let i = 0; i < 256; i++) {
+  const c = i / 255;
+  S2L[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+const l2s = (l) => (l <= 0.0031308 ? 12.92 * l : 1.055 * Math.pow(Math.max(0, l), 1 / 2.4) - 0.055);
+const lin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+
+/* Light from the room as an environment: a simple panorama painted from
+   the background's own colours (ceiling, walls, floor) with a soft bright
+   patch where the window is. It gives faces that look towards the window
+   more light than the others, and the floor colour bounces onto the
+   undersides - the room's light instead of an even grey ambient.     */
+function makeEnvironment(renderer, L) {
+  const w = 128,
+    h = 64;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const x = c.getContext('2d');
+  const im = x.createImageData(w, h);
+  const sky = L.skyColor || [0.95, 0.94, 0.92],
+    wallC = L.wallColor || sky,
+    ground = L.groundColor || [0.6, 0.5, 0.4];
+  const lc = L.color || [1, 0.97, 0.92];
+  const kd = dirFrom(L.azimuth != null ? L.azimuth : -40, L.elevation != null ? L.elevation : 30);
+  const spread = ((L.windowSpread || 40) * Math.PI) / 180;
+  for (let yy = 0; yy < h; yy++)
+    for (let xx = 0; xx < w; xx++) {
+      const u = (xx + 0.5) / w,
+        v = 1 - (yy + 0.5) / h;
+      const a = (u - 0.5) * 2 * Math.PI,
+        el = (v - 0.5) * Math.PI;
+      const d = [Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)];
+      let col;
+      if (d[1] >= 0) col = [0, 1, 2].map((k) => wallC[k] * (1 - d[1]) + sky[k] * d[1]);
+      else col = [0, 1, 2].map((k) => wallC[k] * (1 + d[1]) * 0.85 + ground[k] * -d[1]);
+      const ang = Math.acos(Math.max(-1, Math.min(1, d[0] * kd.x + d[1] * kd.y + d[2] * kd.z)));
+      const win = (L.windowI != null ? L.windowI : 0.6) * Math.exp(-(ang * ang) / (spread * spread));
+      const i = (yy * w + xx) * 4;
+      for (let k = 0; k < 3; k++) im.data[i + k] = Math.min(255, (col[k] * (1 - win) + lc[k] * win) * 255);
+      im.data[i + 3] = 255;
+    }
+  x.putImageData(im, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.encoding = THREE.sRGBEncoding;
+  const pm = new THREE.PMREMGenerator(renderer);
+  const rt = pm.fromEquirectangular(tex);
+  pm.dispose();
+  tex.dispose();
+  return rt;
 }
 
 /* ---------- render ---------- */
@@ -274,7 +343,7 @@ export async function renderLayers(product, bg, opts, onProgress) {
 
   // shadow catchers: an invisible floor and back wall that only show shadow
   const catchMat = new THREE.ShadowMaterial({ opacity: 1 });
-  const reach = (opts.shadowReach != null ? opts.shadowReach : 0.6) + Math.max(psize.x, psize.z) / 2;
+  const reach = (opts.shadowReach != null ? opts.shadowReach : 1.5) + Math.max(psize.x, psize.z) / 2;
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(reach * 2, reach * 2), catchMat);
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(pcen.x, 0, pcen.z);
@@ -288,11 +357,16 @@ export async function renderLayers(product, bg, opts, onProgress) {
   // lights
   const L = opts.light || {};
   const lc = new THREE.Color().setRGB(...(L.color || [1, 0.97, 0.92]));
-  const amb = new THREE.AmbientLight(0xffffff, L.ambI != null ? L.ambI : 0.18);
+  const envRT = makeEnvironment(renderer, L);
+  scene.environment = envRT.texture;
+  obj.traverse((o) => {
+    if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => (m.envMapIntensity = L.envI != null ? L.envI : 0.9));
+  });
+  const amb = new THREE.AmbientLight(0xffffff, L.ambI != null ? L.ambI : 0.03);
   const hemi = new THREE.HemisphereLight(
     new THREE.Color().setRGB(...(L.skyColor || [0.95, 0.95, 0.95])),
     new THREE.Color().setRGB(...(L.groundColor || [0.6, 0.5, 0.4])),
-    L.hemiI != null ? L.hemiI : 0.45
+    L.hemiI != null ? L.hemiI : 0
   );
   scene.add(amb, hemi);
   const key = new THREE.DirectionalLight(lc, 1);
@@ -348,6 +422,24 @@ export async function renderLayers(product, bg, opts, onProgress) {
       m.depthWrite = !h;
     });
 
+  // which pixels see the floor and which the back wall: light is weighted by
+  // how squarely it hits that surface (light grazing a wall barely lights it)
+  const idMatF = new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+    idMatW = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+  floor.material = idMatF;
+  wall.material = idMatW;
+  hideProduct(true);
+  key.visible = sky.visible = false;
+  renderer.render(scene, cam);
+  const idp = read();
+  const rid = new Uint8Array(W * H); // 0 none, 1 floor, 2 wall
+  for (let j = 0, i = 0; j < W * H; j++, i += 4) rid[j] = idp[i + 3] < 128 ? 0 : idp[i] > idp[i + 1] ? 1 : 2;
+  floor.material = catchMat;
+  wall.material = catchMat;
+  hideProduct(false);
+  const wKey = [0, 0, 0],
+    wSky = [0, 0, 0];
+
   for (let s = 0; s < N; s++) {
     const isKey = s < nK;
     let dir;
@@ -362,7 +454,11 @@ export async function renderLayers(product, bg, opts, onProgress) {
       // light from the room: sky directions above, mostly from the front
       const u = halton(s + 1, 2),
         v = halton(s + 1, 3);
-      dir = dirFrom(-55 + u * 110, 45 + v * 40);
+      // every direction the room can send light from: above the floor and
+      // in front of the wall, low angles included (most of the light that
+      // reaches a wall behind an open shelf comes in nearly level)
+      // (below level too: light bouncing off the floor reaches the wall)
+      dir = dirFrom(-85 + u * 170, -35 + v * 120);
     }
     const lp = pcen.clone().add(dir.clone().multiplyScalar(12));
     key.visible = isKey;
@@ -370,7 +466,7 @@ export async function renderLayers(product, bg, opts, onProgress) {
     (isKey ? key : sky).position.copy(lp);
     key.intensity = nK ? (keyI * N) / nK : 0;
     sky.intensity = nS ? (skyI * N) / nS : 0;
-    if (!nS) amb.intensity = (L.ambI != null ? L.ambI : 0.18) + skyI * 0.6; // draft: no sky samples
+    if (!nS) amb.intensity = (L.ambI != null ? L.ambI : 0.03) + skyI * 0.6; // draft: no sky samples
     renderer.shadowMap.needsUpdate = true;
 
     // beauty pass: product only, transparent background
@@ -381,9 +477,9 @@ export async function renderLayers(product, bg, opts, onProgress) {
     let p = read();
     for (let i = 0, j = 0; j < W * H; i += 4, j++) {
       const a = p[i + 3] / 255;
-      beauty[i] += (p[i] / 255) * a;
-      beauty[i + 1] += (p[i + 1] / 255) * a;
-      beauty[i + 2] += (p[i + 2] / 255) * a;
+      beauty[i] += S2L[p[i]] * a; // linear light, premultiplied
+      beauty[i + 1] += S2L[p[i + 1]] * a;
+      beauty[i + 2] += S2L[p[i + 2]] * a;
       beauty[i + 3] += a;
     }
     // shadow pass: only what the invisible floor and wall catch
@@ -393,15 +489,22 @@ export async function renderLayers(product, bg, opts, onProgress) {
     renderer.render(scene, cam);
     p = read();
     const tgt = isKey ? shadow : ao;
-    for (let i = 3, j = 0; j < W * H; i += 4, j++) tgt[j] += p[i] / 255;
+    // floor faces up, wall faces the room; bounce light from below is weaker
+    const wts = [0, Math.max(0, dir.y), Math.max(0, dir.z) * (dir.y < 0 ? 0.55 : 1)];
+    const acc = isKey ? wKey : wSky;
+    acc[1] += wts[1];
+    acc[2] += wts[2];
+    for (let i = 3, j = 0; j < W * H; i += 4, j++) if (rid[j]) tgt[j] += (p[i] / 255) * wts[rid[j]];
     hideProduct(false);
     if (onProgress) onProgress((s + 1) / N);
     if (s % 2 === 1) await new Promise((r) => setTimeout(r, 0)); // keep the page responsive
   }
   for (let i = 0; i < beauty.length; i++) beauty[i] /= N;
+  envRT.dispose();
   for (let j = 0; j < W * H; j++) {
-    shadow[j] /= Math.max(1, nK);
-    ao[j] /= Math.max(1, nS);
+    const r = rid[j];
+    shadow[j] = r ? shadow[j] / Math.max(1e-6, wKey[r]) : 0;
+    ao[j] = r ? ao[j] / Math.max(1e-6, wSky[r]) : 0;
   }
   // where the product's feet are, in picture pixels (for the UI guides)
   const foot = new THREE.Vector3(pcen.x, 0, pbox.max.z).project(cam);
@@ -415,52 +518,92 @@ export async function renderLayers(product, bg, opts, onProgress) {
     shadow,
     ao,
     hasAO: nS > 0,
+    rid,
     sol,
     footPx: [((foot.x + 1) / 2) * outW, ((1 - foot.y) / 2) * outH],
   };
 }
 
 /* ---------- 2D finish: put the layers onto the background ----------
-   look: { shadowK, aoK, exposure, whiteBalance[3], warmth, blur, grain }  */
+   All in linear light. The background wall gets two kinds of light: the
+   window's direct light (share keyShare) and the room's soft light (the
+   rest). The key shadow takes away only the first, ambient occlusion only
+   a part of the second - so they never darken the same light twice.
+   look: { keyShare, shadowK, aoK, exposure, whiteBalance[3], blur,
+           shadowBlur, grain, fade }                                    */
+const DEF_LOOK = { keyShare: 0.25, shadowK: 1, aoK: 0.4, aoFloorK: 0.85, exposure: 1, whiteBalance: [1, 1, 1], blur: 0.6, shadowBlur: 2.5, grain: 1.4, fade: 0.45 };
+
+// box-average a layer from render size down to output size
+function downsample(src, W, H, ss, ch) {
+  const w = W / ss,
+    h = H / ss,
+    out = new Float32Array(w * h * ch),
+    k = 1 / (ss * ss);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      for (let c = 0; c < ch; c++) {
+        let v = 0;
+        for (let dy = 0; dy < ss; dy++) for (let dx = 0; dx < ss; dx++) v += src[((y * ss + dy) * W + x * ss + dx) * ch + c];
+        out[(y * w + x) * ch + c] = v * k;
+      }
+  return out;
+}
+// gaussian blur in place (separable), any number of channels
+function blur(a, w, h, ch, sigma) {
+  if (!(sigma > 0.05)) return a;
+  const r = Math.ceil(sigma * 3),
+    ker = [];
+  let sum = 0;
+  for (let i = -r; i <= r; i++) {
+    const v = Math.exp(-(i * i) / (2 * sigma * sigma));
+    ker.push(v);
+    sum += v;
+  }
+  ker.forEach((v, i) => (ker[i] = v / sum));
+  const tmp = new Float32Array(a.length);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      for (let c = 0; c < ch; c++) {
+        let v = 0;
+        for (let i = -r; i <= r; i++) v += a[(y * w + Math.min(w - 1, Math.max(0, x + i))) * ch + c] * ker[i + r];
+        tmp[(y * w + x) * ch + c] = v;
+      }
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++)
+      for (let c = 0; c < ch; c++) {
+        let v = 0;
+        for (let i = -r; i <= r; i++) v += tmp[(Math.min(h - 1, Math.max(0, y + i)) * w + x) * ch + c] * ker[i + r];
+        a[(y * w + x) * ch + c] = v;
+      }
+  return a;
+}
+
 export function composite(bg, layers, look) {
   const { W, H, outW, outH, ss } = layers;
-  const lk = Object.assign({ shadowK: 0.55, aoK: 0.5, exposure: 0.97, whiteBalance: [1, 1, 1], blur: 0.5, grain: 1.6 }, look || {});
-  // layers at render size -> output size (supersampled, so edges come out smooth)
-  const toCanvas = (fill, blurPx) => {
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = H;
-    const x = c.getContext('2d');
-    const im = x.createImageData(W, H);
-    fill(im.data);
-    x.putImageData(im, 0, 0);
-    const o = document.createElement('canvas');
-    o.width = outW;
-    o.height = outH;
-    const ox = o.getContext('2d');
-    ox.imageSmoothingQuality = 'high';
-    const bp = blurPx != null ? blurPx : lk.blur;
-    if (bp > 0) ox.filter = `blur(${bp}px)`;
-    ox.drawImage(c, 0, 0, outW, outH);
-    return ox.getImageData(0, 0, outW, outH).data;
-  };
-  const prod = toCanvas((d) => {
-    const b = layers.beauty;
-    for (let i = 0; i < b.length; i += 4) {
-      const a = b[i + 3];
-      d[i] = a > 0 ? Math.min(255, (b[i] / a) * 255) : 0;
-      d[i + 1] = a > 0 ? Math.min(255, (b[i + 1] / a) * 255) : 0;
-      d[i + 2] = a > 0 ? Math.min(255, (b[i + 2] / a) * 255) : 0;
-      d[i + 3] = a * 255;
-    }
-  });
-  const sh = toCanvas((d) => {
-    for (let j = 0; j < W * H; j++) {
-      d[j * 4] = layers.shadow[j] * 255;
-      d[j * 4 + 1] = layers.hasAO ? layers.ao[j] * 255 : 0;
-      d[j * 4 + 3] = 255;
-    }
-  }, lk.shadowBlur != null ? lk.shadowBlur : 2);
+  const lk = Object.assign({}, DEF_LOOK, look || {});
+  const prod = blur(downsample(layers.beauty, W, H, ss, 4), outW, outH, 4, lk.blur);
+  const sh = blur(downsample(layers.shadow, W, H, ss, 1), outW, outH, 1, lk.shadowBlur);
+  const ao = layers.hasAO ? blur(downsample(layers.ao, W, H, ss, 1), outW, outH, 1, lk.shadowBlur * 0.6) : null;
+  // floor or wall under each pixel: the floor right under furniture reads
+  // darker (contact shadow) than a wall behind it
+  const fl = new Float32Array(W * H);
+  if (layers.rid) for (let j = 0; j < W * H; j++) fl[j] = layers.rid[j] === 1 ? 1 : 0;
+  const floorFrac = blur(downsample(fl, W, H, ss, 1), outW, outH, 1, 1);
+  // shadows fade out softly around the product instead of stopping at the
+  // edge of the area they were calculated for
+  let bx0 = outW,
+    bx1 = 0,
+    by0 = outH,
+    by1 = 0;
+  for (let y = 0; y < outH; y++)
+    for (let x = 0; x < outW; x++)
+      if (prod[(y * outW + x) * 4 + 3] > 0.05) {
+        if (x < bx0) bx0 = x;
+        if (x > bx1) bx1 = x;
+        if (y < by0) by0 = y;
+        if (y > by1) by1 = y;
+      }
+  const span = Math.max(20, bx1 - bx0) * lk.fade;
   const c = document.createElement('canvas');
   c.width = outW;
   c.height = outH;
@@ -469,27 +612,34 @@ export function composite(bg, layers, look) {
   const im = x.getImageData(0, 0, outW, outH);
   const d = im.data;
   const wb = lk.whiteBalance;
-  // shadows in a lit room are a little cooler than the light
-  const tint = [1.0, 1.02, 1.06];
+  const tint = [1.0, 0.97, 0.9]; // shadows keep a little more blue (cooler)
   let seed = 12345;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5) * 2;
-  for (let i = 0; i < d.length; i += 4) {
-    const s = sh[i] / 255,
-      o = sh[i + 1] / 255;
-    const shade = (1 - lk.shadowK * s) * (1 - lk.aoK * o);
-    const a = prod[i + 3] / 255;
-    const n = lk.grain * rnd();
-    for (let k = 0; k < 3; k++) {
-      const bgv = d[i + k] * Math.min(1, shade * (shade < 1 ? tint[k] : 1));
-      const pv = prod[i + k] * wb[k] * lk.exposure;
-      d[i + k] = Math.max(0, Math.min(255, bgv * (1 - a) + pv * a + n));
+  const keyS = lk.keyShare * lk.shadowK;
+  for (let y = 0; y < outH; y++)
+    for (let xx = 0; xx < outW; xx++) {
+      const j = y * outW + xx,
+        i = j * 4;
+      const dx = Math.max(bx0 - xx, 0, xx - bx1),
+        dy = Math.max(by0 - y, 0, y - by1);
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const t = Math.min(1, Math.max(0, (dist - span) / span));
+      const wgt = 1 - t * t * (3 - 2 * t);
+      const aoS = (1 - lk.keyShare) * (lk.aoK + (lk.aoFloorK - lk.aoK) * floorFrac[j]);
+      const loss = (keyS * sh[j] + (ao ? aoS * ao[j] : 0)) * wgt;
+      const a = prod[i + 3];
+      const n = lk.grain * rnd();
+      for (let k = 0; k < 3; k++) {
+        const bgl = S2L[d[i + k]] * Math.max(0.12, 1 - loss * tint[k]);
+        const v = bgl * (1 - a) + prod[i + k] * wb[k] * lk.exposure;
+        d[i + k] = Math.max(0, Math.min(255, l2s(v) * 255 + n));
+      }
     }
-  }
   x.putImageData(im, 0, 0);
   return c;
 }
 
-/* single layers as pictures, for checking or for retouching elsewhere */
+/* single layers as pictures (render size), for checking or retouching */
 export function layerImages(layers) {
   const { W, H } = layers;
   const mk = (fill) => {
@@ -502,37 +652,27 @@ export function layerImages(layers) {
     x.putImageData(im, 0, 0);
     return c;
   };
+  const gray = (d, j, v) => {
+    d[j * 4] = d[j * 4 + 1] = d[j * 4 + 2] = v;
+    d[j * 4 + 3] = 255;
+  };
   return {
     beauty: mk((d) => {
       const b = layers.beauty;
       for (let i = 0; i < b.length; i += 4) {
         const a = b[i + 3];
-        d[i] = a > 0 ? (b[i] / a) * 255 : 0;
-        d[i + 1] = a > 0 ? (b[i + 1] / a) * 255 : 0;
-        d[i + 2] = a > 0 ? (b[i + 2] / a) * 255 : 0;
+        for (let k = 0; k < 3; k++) d[i + k] = a > 0 ? l2s(b[i + k] / a) * 255 : 0;
         d[i + 3] = a * 255;
       }
     }),
     alpha: mk((d) => {
-      for (let j = 0; j < W * H; j++) {
-        const v = layers.beauty[j * 4 + 3] * 255;
-        d[j * 4] = d[j * 4 + 1] = d[j * 4 + 2] = v;
-        d[j * 4 + 3] = 255;
-      }
+      for (let j = 0; j < W * H; j++) gray(d, j, layers.beauty[j * 4 + 3] * 255);
     }),
     shadow: mk((d) => {
-      for (let j = 0; j < W * H; j++) {
-        const v = 255 - layers.shadow[j] * 255;
-        d[j * 4] = d[j * 4 + 1] = d[j * 4 + 2] = v;
-        d[j * 4 + 3] = 255;
-      }
+      for (let j = 0; j < W * H; j++) gray(d, j, 255 - layers.shadow[j] * 255);
     }),
     ao: mk((d) => {
-      for (let j = 0; j < W * H; j++) {
-        const v = 255 - (layers.hasAO ? layers.ao[j] : 0) * 255;
-        d[j * 4] = d[j * 4 + 1] = d[j * 4 + 2] = v;
-        d[j * 4 + 3] = 255;
-      }
+      for (let j = 0; j < W * H; j++) gray(d, j, 255 - (layers.hasAO ? layers.ao[j] : 0) * 255);
     }),
   };
 }

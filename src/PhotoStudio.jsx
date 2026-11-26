@@ -20,8 +20,8 @@ import { QUALITY, renderLayers, composite, layerImages, analyseBackground, guess
 const PANEL = '#f7f7f5';
 const DEF_CAL = { horizonY: 0.5, floorY: 0.78, refY: 0.54, refH: 0.914, hfov: 50, yaw: 0 };
 const DEF_PLACE = { xFrac: 0.72, wallGap: 0.02, yaw: 0 };
-const DEF_LIGHT = { azimuth: -45, elevation: 28, softness: 18, keyI: 0.7, skyI: 0.35, ambI: 0.12, hemiI: 0.55, color: [1, 0.97, 0.92] };
-const DEF_LOOK = { shadowK: 0.5, aoK: 0.18, shadowBlur: 2.5, exposure: 0.97, whiteBalance: [1, 1, 1], blur: 0.5, grain: 1.6 };
+const DEF_LIGHT = { azimuth: -65, elevation: 28, softness: 18, keyI: 0.55, skyI: 0.25, ambI: 0.02, hemiI: 0, envI: 0.45, windowI: 0.6, color: [1, 0.97, 0.92] };
+const DEF_LOOK = { keyShare: 0.25, shadowK: 1, aoK: 0.4, aoFloorK: 0.85, shadowBlur: 2.5, exposure: 1, whiteBalance: [1, 1, 1], blur: 0.6, grain: 1.4, fade: 0.45 };
 
 function Slider({ label, value, min, max, step, onChange, fmt }) {
   return (
@@ -96,8 +96,8 @@ export default function PhotoStudio() {
       });
       setBgName(file.name.replace(/\.[^.]+$/, ''));
       setCal({ ...DEF_CAL, floorY, refY: Math.max(0.2, floorY - 0.25) });
-      setLightP({ azimuth: Math.round(a.azimuth), color: a.whiteBalance.map((v) => Math.min(1, v)), skyColor: a.skyColor, groundColor: a.groundColor });
-      setLookP({ whiteBalance: a.whiteBalance, exposure: Math.round(a.exposure * 100) / 100 });
+      setLightP({ azimuth: Math.round(a.azimuth), color: a.whiteBalance.map((v) => Math.min(1, v)), skyColor: a.skyColor, wallColor: a.wallColor, groundColor: a.groundColor });
+      setLookP({ whiteBalance: a.whiteBalance });
       setResult(null);
     };
     img.src = url;
@@ -280,9 +280,14 @@ export default function PhotoStudio() {
           <Slider label="빛 퍼짐 (그림자 부드러움)" value={light.softness} min={0} max={30} step={1} fmt={(v) => `${v}°`} onChange={(v) => setLightP({ softness: v })} />
           <Slider label="주광 세기" value={light.keyI} min={0} max={2} step={0.01} onChange={(v) => setLightP({ keyI: v })} />
           <Slider label="실내 반사광" value={light.skyI} min={0} max={1.5} step={0.01} onChange={(v) => setLightP({ skyI: v })} />
-          <Slider label="그림자 진하기" value={look.shadowK} min={0} max={1} step={0.01} onChange={(v) => setLookP({ shadowK: v })} />
+          <Slider label="방 환경광 (면별 명암·반사색)" value={light.envI} min={0} max={2} step={0.01} onChange={(v) => setLightP({ envI: v })} />
+          <div className="text-[11px] text-gray-500 mt-2 mb-1">배경 벽에 더하는 그림자</div>
+          <Slider label="창문 직사광 비율" value={look.keyShare} min={0} max={0.9} step={0.01} onChange={(v) => setLookP({ keyShare: v })} />
+          <Slider label="그림자 진하기" value={look.shadowK} min={0} max={1.5} step={0.01} onChange={(v) => setLookP({ shadowK: v })} />
+          <Slider label="그림자 범위 (제품 폭 대비)" value={look.fade} min={0.15} max={1.2} step={0.01} onChange={(v) => setLookP({ fade: v })} />
           <Slider label="그림자 번짐" value={look.shadowBlur} min={0} max={8} step={0.5} fmt={(v) => `${v}px`} onChange={(v) => setLookP({ shadowBlur: v })} />
-          <Slider label="접촉 음영 (AO)" value={look.aoK} min={0} max={1} step={0.01} onChange={(v) => setLookP({ aoK: v })} />
+          <Slider label="바닥 접촉 음영 (발끝)" value={look.aoFloorK} min={0} max={1} step={0.01} onChange={(v) => setLookP({ aoFloorK: v })} />
+          <Slider label="벽 음영 (AO)" value={look.aoK} min={0} max={1} step={0.01} onChange={(v) => setLookP({ aoK: v })} />
           <Slider label="제품 노출" value={look.exposure} min={0.6} max={1.3} step={0.01} onChange={(v) => setLookP({ exposure: v })} />
           <Slider label="선명도 맞춤 (흐림)" value={look.blur} min={0} max={2} step={0.05} fmt={(v) => `${v}px`} onChange={(v) => setLookP({ blur: v })} />
           <Slider label="노이즈" value={look.grain} min={0} max={6} step={0.1} onChange={(v) => setLookP({ grain: v })} />
