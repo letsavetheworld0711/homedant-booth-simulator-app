@@ -338,6 +338,23 @@ const PRODUCT_LIBRARY = [
   },
 
   {
+    // the pegboard shelf on casters: same levels and perforated beams
+    id: 'hh_perf_rolling',
+    brand: 'HOMEDANT HOUSE',
+    category: 'Pegboard Rolling Shelf',
+    name: 'House Pegboard Rolling Shelf',
+    type: 'pegboard',
+    rolling: true,
+    defaultSize: { width: 600, depth: 400, height: 900 },
+    sizeOptions: HOMEDANT_PERF_SIZES,
+    tierOptions: [3, 4, 5, 6, 7, 8],
+    defaultTier: 3,
+    frameColors: ['black', 'white'],
+    boardColors: ['wood', 'white'],
+    addOns: [],
+  },
+
+  {
     id: 'hh_trolley',
     brand: 'HOMEDANT HOUSE',
     category: 'Trolley',
@@ -776,6 +793,8 @@ function registerRenderImagesByFilename(list, baseUrl = '/assets/renderings/') {
    rack image just because it's the same brand.                       */
 function findRenderImage(product, tpl) {
   if (!product || !tpl || !RENDER_IMAGE_MANIFEST.length) return null;
+  // MAX 200 has no renders of its own; don't borrow the SPEEDRACK wood ones
+  if (tpl.id && tpl.id.startsWith('lr_')) return null;
   const wantBrand = tpl.brand;
   const wantType = tpl.type;
   // strict: same brand AND same type
@@ -1219,6 +1238,7 @@ const KO = {
   "House Slim Shelf": "틈새선반",
   "House Open Base Shelf": "오픈베이스 선반",
   "House Pegboard Shelf": "타공선반",
+  "House Pegboard Rolling Shelf": "타공바퀴 선반",
   "House Trolley": "트롤리",
   "House Perforated Trolley": "타공 트롤리",
   "Trolley": "트롤리",
@@ -1236,6 +1256,7 @@ const KO = {
   "Drawer Shelf": "서랍행거",
   "Cabinet Shelf": "캐비닛 선반",
   "Pegboard Shelf": "타공선반",
+  "Pegboard Rolling Shelf": "타공바퀴 선반",
   "Banner Stand": "롤업 배너",
   "Catalog Stand": "카탈로그 거치대",
   "Chair": "의자",
@@ -2036,6 +2057,7 @@ function addSPPosts(group, w, d, h, frameMat) {
 // open side facing the post behind it. The posts sit behind the beams.
 function addLRPosts(group, w, d, h, frameMat) {
   const { postW: PW, postD: PD, sheet: t, beamD: D } = LR_SPEC;
+  h -= 0.0015; // the top deck sits on the post tops
   const sideMat = slottedFaceMat(frameMat, 'lr', false, h);
   const front = new THREE.BoxGeometry(PW, h, t);
   const side = new THREE.PlaneGeometry(PD, h);
@@ -2112,7 +2134,22 @@ function addLRLevel(group, w, d, yBoard, frameMat, thickness) {
       hhAdd(group, new THREE.BoxGeometry(w - 0.002, t, D), frameMat, 0, top - BH + t / 2, z - s * (D / 2));
       hhAdd(group, new THREE.BoxGeometry(w - 0.002, 0.006, t), frameMat, 0, top - BH + 0.004, z - s * (D - t / 2));
     });
-    hhAdd(group, new THREE.BoxGeometry(wi - 0.002, 0.0015, d - 2 * D), deckMat, 0, top - 0.00075, 0);
+    const prod = frameMat.userData.hh.product;
+    // full-width top deck only when the top level is at the post tops
+    const isTop = cur.i === cur.n - 1 && cur.n > 1 && (!prod || Math.abs(top - prod.height * MM_TO_M) < 0.002);
+    if (isTop) {
+      // top deck runs the full width over the post tops (the posts end
+      // under it), with a side rail under each side between the posts
+      const { postD: PD } = LR_SPEC;
+      hhAdd(group, new THREE.BoxGeometry(w - 0.002, 0.0015, d - 2 * D), deckMat, 0, top - 0.00075, 0);
+      [-1, 1].forEach((s) => {
+        const rail = d - 2 * D - 2 * PD;
+        hhAdd(group, new THREE.BoxGeometry(t, 0.04, rail), frameMat, s * (w / 2 - 0.0012), top - 0.0015 - 0.02, 0);
+        hhAdd(group, new THREE.BoxGeometry(0.012, t, rail), frameMat, s * (w / 2 - 0.007), top - 0.0015 - 0.04, 0);
+      });
+    } else {
+      hhAdd(group, new THREE.BoxGeometry(wi - 0.002, 0.0015, d - 2 * D), deckMat, 0, top - 0.00075, 0);
+    }
   } else {
     // tray between the posts, hooked into their side slots
     const dz = d - 2 * D - 0.004;
@@ -3472,7 +3509,7 @@ function hhOuterLabel(p) {
   };
 }
 function hhOuterSize(p) {
-  const rolling = ['hh_rolling', 'hh_trolley', 'hh_perf_trolley', 'sp_rolling', 'lr_rolling'].includes(p.productId);
+  const rolling = ['hh_rolling', 'hh_perf_rolling', 'hh_trolley', 'hh_perf_trolley', 'sp_rolling', 'lr_rolling'].includes(p.productId);
   const casterMM = rolling ? (hhSmallCaster(p) ? 69 : 104) : 0;
   const S = specOfProduct(p);
   if (S.kind === 'sp')
@@ -3761,6 +3798,12 @@ function makePegboardTexture(isBlack) {
 /* Perforated beam: a tall plate (180 mm) with five rows of round holes at
    a 25 mm pitch, used in place of an ordinary beam.                    */
 const HH_PERF_H = 0.18;
+// Every perforated product uses the same part (CAD 타공받침300/600:
+// 179.7 mm tall, five rows, 25 mm pitch). It needs room to fit in the
+// bay; where the bay is too low the level keeps an ordinary beam.
+function hhPerfFit(room) {
+  return room >= 0.16 ? Math.min(HH_PERF_H, room) : 0;
+}
 function hhPerfMaterial(len, height, hex, hanging = false) {
   const cols = Math.floor((len - 0.09) / 0.025) + 1;
   // holes from 27 mm below the top edge down to the beam's plain band
@@ -3779,7 +3822,11 @@ function hhPerfMaterial(len, height, hex, hanging = false) {
         x.fill();
       }
   });
-  tex.anisotropy = 8;
+  // No mipmaps: averaged down for distance the small holes fill in and the
+  // panel looks solid; without them the holes stay cut out at any zoom.
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
   return new THREE.MeshStandardMaterial({
     color: hex,
     map: tex,
@@ -3804,12 +3851,8 @@ function buildHHTrolley(group, p, tpl) {
   // the level under the top, rising from it
   const lv = hhResolveLevels(p, tiers);
   if (tpl.perforated && tiers >= 2) {
-    const L = lv[tiers - 2],
-      N = lv[tiers - 1];
-    const beamBottom = L.h * MM_TO_M - (L.style === 'basket' ? 0 : 0.009) - BH;
-    const room = N.h * MM_TO_M - BH - 0.009 - 0.02 - beamBottom;
-    const ph = Math.min(HH_PERF_H, room);
-    if (ph >= 0.16) {
+    const ph = hhPerfRise(p, tiers)[tiers - 2];
+    if (ph) {
       mats.frame.userData.hh.perf = { [tiers - 2]: ph };
       mats.frame.userData.hh.perfUp = true;
     }
@@ -3874,23 +3917,22 @@ function hhPegPanelMaterial(w, h, hex) {
     metalness: 0,
   });
 }
-/* HOMEDANT HOUSE pegboard shelf: an ordinary shelf whose back and end
-   beams are perforated beams. Like the perforated trolley's (CAD: 180 mm
-   plate covering 170 of the 253 mm between two levels), each one covers
-   about two thirds of the bay, but here it hangs from the level above,
+/* HOMEDANT HOUSE pegboard shelf (and its rolling version): an ordinary
+   shelf whose back and end beams are the perforated beam part, the same
+   one as the perforated trolley's. Here it hangs from the level above,
    so the top of each bay is closed and the bottom is open.            */
-const HH_PERF_RATIO = 170 / 253;
-function hhPerfDrops(p, tiers) {
-  const { beamH: BH, sheet: t } = HH;
+// The part stands up from a level's beam (as on the trolley and in the
+// product photos), keeping 20 mm under the level above.
+function hhPerfRise(p, tiers) {
+  const { beamH: BH } = HH;
   const lv = hhResolveLevels(p, tiers);
   const out = {};
-  for (let i = 1; i < tiers; i++) {
-    const L = lv[i - 1],
-      N = lv[i];
-    const boardTop = L.style === 'basket' ? L.h * MM_TO_M - BH + t + 0.009 : L.h * MM_TO_M;
-    const beamTop = N.h * MM_TO_M - (N.style === 'basket' ? 0 : 0.009);
-    const clear = beamTop - BH - boardTop;
-    out[i] = BH + clear * HH_PERF_RATIO;
+  for (let i = 0; i < tiers - 1; i++) {
+    const L = lv[i],
+      N = lv[i + 1];
+    const beamBottom = L.h * MM_TO_M - (L.style === 'basket' ? 0 : 0.009) - BH;
+    const ph = hhPerfFit(N.h * MM_TO_M - BH - 0.009 - 0.02 - beamBottom);
+    if (ph) out[i] = ph;
   }
   return out;
 }
@@ -3900,10 +3942,18 @@ function buildHHPegShelf(group, p, tpl) {
     h = p.height * MM_TO_M;
   const mats = makeMaterials(p, { house: true });
   const tiers = p.tier || tpl.defaultTier;
-  mats.frame.userData.hh.perf = hhPerfDrops(p, tiers);
-  addPosts(group, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
-  addTierBoards(group, w, d, h, tiers, mats.board, { frameMat: mats.frame });
-  addPostFeet(group, w, d, mats.foot, 0.025);
+  mats.frame.userData.hh.perf = hhPerfRise(p, tiers);
+  mats.frame.userData.hh.perfUp = true;
+  // rolling version: the frame stands on the casters (same rule as the
+  // rolling shelf: 2" up to 600 x 400, 3" above)
+  const host = tpl.rolling ? new THREE.Group() : group;
+  if (tpl.rolling) host.position.y = hhCasterH(p) + FRAME_LIFT;
+  addPosts(host, w, d, h, mats.frame, 0.025, { postMat: mats.postMat });
+  addTierBoards(host, w, d, h, tiers, mats.board, { frameMat: mats.frame });
+  if (tpl.rolling) {
+    group.add(host);
+    addHHCasters(group, host, w, d, hhCasterH(p));
+  } else addPostFeet(group, w, d, mats.foot, 0.025);
 }
 
 function buildPegboard(group, p, tpl) {
@@ -4793,6 +4843,7 @@ function buildProductMesh(p, tpl) {
     isLevelProduct(tpl) &&
     specOfProduct(p).kind !== 'lr' &&
     tpl.type !== 'rolling' &&
+    !tpl.rolling &&
     tpl.type !== 'trolley' &&
     tpl.type !== 'staff'
   )
@@ -6279,7 +6330,7 @@ function BoothSimulator() {
       const tpl = PRODUCT_LIBRARY.find((t) => t.id === p.productId);
       if (!tpl) return;
       let mesh = map.get(p.instanceId);
-      const fingerprint = `${p.caption || ''}-${p.width}-${p.depth}-${p.height}-${p.tier}-${p.frameColor}-${p.boardColor}-${p.shelfStyle || 'basic'}-${p.levelsKey || ''}-${
+      const fingerprint = `${p.productId}-${p.caption || ''}-${p.width}-${p.depth}-${p.height}-${p.tier}-${p.frameColor}-${p.boardColor}-${p.shelfStyle || 'basic'}-${p.levelsKey || ''}-${
         Array.isArray(p.levels)
           ? p.levels.map((l) => `${l.h}${l.style}`).join('.')
           : ''
@@ -8823,6 +8874,8 @@ function ProductThumb({ type, tpl, product }) {
         <circle cx="15" cy="11" r="0.6" fill={stroke} />
         <line x1="5" y1="15" x2="19" y2="15" />
         <line x1="5" y1="19" x2="19" y2="19" />
+        {tpl && tpl.rolling && <circle cx="8" cy="22" r="1.1" />}
+        {tpl && tpl.rolling && <circle cx="16" cy="22" r="1.1" />}
       </svg>
     );
   }
