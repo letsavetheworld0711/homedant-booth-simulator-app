@@ -1971,12 +1971,6 @@ function frameSlotTexture(kind, fromRight) {
   const PX = 4; // px per mm
   const faceW = sp ? 33.6 : 42.1,
     pitch = 30;
-  const cv = document.createElement('canvas');
-  cv.width = Math.round(faceW * PX);
-  cv.height = pitch * PX;
-  const x = cv.getContext('2d');
-  x.fillStyle = '#ffffff';
-  x.fillRect(0, 0, cv.width, cv.height);
   const sw = sp ? 13.4 : 11.3,
     sh = sp ? 19.9 : 15.4,
     bottom = sp ? 4.8 : 8.3;
@@ -1988,33 +1982,50 @@ function frameSlotTexture(kind, fromRight) {
     neck = sw * 0.29,
     shoulder = top - sh * 0.42,
     waist = shoulder - sh * 0.16;
-  x.globalCompositeOperation = 'destination-out';
-  x.beginPath();
-  x.moveTo(...P(cu - wide, top));
-  x.lineTo(...P(cu + wide, top));
-  x.lineTo(...P(cu + wide, shoulder));
-  x.lineTo(...P(cu + neck, waist));
-  x.lineTo(...P(cu + neck, bottom));
-  x.lineTo(...P(cu - neck, bottom));
-  x.lineTo(...P(cu - neck, waist));
-  x.lineTo(...P(cu - wide, shoulder));
-  x.closePath();
-  x.fill();
-  x.globalCompositeOperation = 'source-over';
-  const tex = new THREE.CanvasTexture(cv);
-  tex.wrapS = THREE.ClampToEdgeWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 8;
-  _frameSlotTex[key] = tex;
-  return tex;
+  // colour map (slot painted dark) + alpha map (slot cut out), both
+  // mipmapped: up close the keyholes are cut through; from far away they
+  // fade to even dark marks instead of a jagged, flickering pattern
+  const make = (hole) => {
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(faceW * PX);
+    cv.height = pitch * PX;
+    const x = cv.getContext('2d');
+    x.fillStyle = '#ffffff';
+    x.fillRect(0, 0, cv.width, cv.height);
+    x.fillStyle = hole;
+    x.beginPath();
+    x.moveTo(...P(cu - wide, top));
+    x.lineTo(...P(cu + wide, top));
+    x.lineTo(...P(cu + wide, shoulder));
+    x.lineTo(...P(cu + neck, waist));
+    x.lineTo(...P(cu + neck, bottom));
+    x.lineTo(...P(cu - neck, bottom));
+    x.lineTo(...P(cu - neck, waist));
+    x.lineTo(...P(cu - wide, shoulder));
+    x.closePath();
+    x.fill();
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = 16;
+    return tex;
+  };
+  const pair = { map: make('#555555'), alpha: make('#000000') };
+  _frameSlotTex[key] = pair;
+  return pair;
 }
 function slottedFaceMat(frameMat, kind, fromRight, height) {
-  const tex = frameSlotTexture(kind, fromRight).clone();
-  tex.needsUpdate = true;
-  tex.repeat.set(1, height / 0.03);
+  const src = frameSlotTexture(kind, fromRight);
+  const [tex, alpha] = [src.map.clone(), src.alpha.clone()];
+  [tex, alpha].forEach((t) => {
+    t.needsUpdate = true;
+    t.repeat.set(1, height / 0.03);
+  });
   return new THREE.MeshStandardMaterial({
     color: frameMat.color.getHex(),
     map: tex,
+    alphaMap: alpha,
+    alphaToCoverage: true,
     alphaTest: 0.5,
     side: THREE.DoubleSide,
     metalness: frameMat.metalness,
@@ -3822,10 +3833,13 @@ function hhPerfMaterial(len, height, hex, hanging = false) {
   // to the plain band at the bottom (179.7 mm part: 5 rows)
   const cols = Math.round((len - 0.0978) / 0.025) + 1;
   const rows = Math.max(1, Math.floor((height - 0.0767) / 0.025) + 1);
-  const tex = labelTexture(`perf${Math.round(len * 1000)}x${Math.round(height * 1000)}${hanging ? 'h' : ''}`, Math.min(2048, Math.round(len * 2400)), Math.min(2048, Math.round(height * 2400)), (x, cw, ch) => {
-    x.fillStyle = '#ffffff';
+  const key = `perf${Math.round(len * 1000)}x${Math.round(height * 1000)}${hanging ? 'h' : ''}`;
+  const cw0 = Math.min(2048, Math.round(len * 2400)),
+    ch0 = Math.min(2048, Math.round(height * 2400));
+  const draw = (bg, hole) => (x, cw, ch) => {
+    x.fillStyle = bg;
     x.fillRect(0, 0, cw, ch);
-    x.globalCompositeOperation = 'destination-out';
+    x.fillStyle = hole;
     const px = cw / len,
       py = ch / height;
     for (let r = 0; r < rows; r++)
@@ -3835,16 +3849,24 @@ function hhPerfMaterial(len, height, hex, hanging = false) {
         x.ellipse(cw / 2 + (c - (cols - 1) / 2) * 0.025 * px, hanging ? ch - y : y, 0.003 * px, 0.003 * py, 0, 0, Math.PI * 2);
         x.fill();
       }
+  };
+  // Two textures, both mipmapped so the hole grid stays even at any
+  // distance (no flicker or crooked rows): the alpha map cuts the holes
+  // out up close; the colour map also paints each hole dark, so from far
+  // away, where the cut-outs are too small to survive, the holes still
+  // read as an even grid of dark dots instead of vanishing.
+  const map = labelTexture(key + 'c', cw0, ch0, draw('#ffffff', '#555555'));
+  const alpha = labelTexture(key + 'a', cw0, ch0, draw('#ffffff', '#000000'));
+  [map, alpha].forEach((t) => {
+    t.anisotropy = 16;
+    t.needsUpdate = true;
   });
-  // No mipmaps: averaged down for distance the small holes fill in and the
-  // panel looks solid; without them the holes stay cut out at any zoom.
-  tex.generateMipmaps = false;
-  tex.minFilter = THREE.LinearFilter;
-  tex.needsUpdate = true;
   return new THREE.MeshStandardMaterial({
     color: hex,
-    map: tex,
+    map,
+    alphaMap: alpha,
     alphaTest: 0.5,
+    alphaToCoverage: true, // smooth hole edges with the renderer's MSAA
     side: THREE.DoubleSide,
     roughness: 0.6,
     metalness: 0,
