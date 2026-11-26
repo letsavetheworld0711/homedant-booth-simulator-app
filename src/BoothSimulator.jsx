@@ -2269,13 +2269,18 @@ function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style, p
   const beamTop = basket ? yBoard + thickness / 2 : yBoard - thickness / 2;
   const beamMid = beamTop - BH / 2;
   const lipY = basket ? beamTop - BH + t / 2 : beamTop - t / 2;
-  // perforated beam (back and both ends): the same folded plate as an
-  // ordinary beam, only taller: hanging down from the board, or (trolley)
-  // rising from the beam's bottom edge
+  // perforated beam (back and both ends). From the CAD (타공받침300/600):
+  // it IS the beam on those sides, no ordinary beam under it. The board
+  // rests on its bottom lip and the plate rises 179.7 mm from the board's
+  // underside. Length = size name - 2.2 mm (297.8 / 597.8), i.e. the
+  // outside size (name + 20) - 22.2 mm.
   if (perfH > BH) {
-    const yc = perfUp ? beamTop - BH + perfH / 2 : beamTop - perfH / 2;
-    const lenX = w - 2 * T,
-      lenZ = d - 2 * T - 2 * t;
+    // the folded lip at its foot is under the board, so the face starts
+    // one sheet below the board and covers the board's edge
+    const plateBottom = basket ? beamTop - BH : beamTop - t;
+    const yc = perfUp ? plateBottom + perfH / 2 : beamTop - perfH / 2;
+    const lenX = w - 0.0222,
+      lenZ = d - 0.0222;
     const hex = frameMat.color.getHex();
     const back = new THREE.Mesh(new THREE.PlaneGeometry(lenX, perfH), hhPerfMaterial(lenX, perfH, hex, !perfUp));
     back.position.set(0, yc, -(d / 2 - T - t / 2));
@@ -2308,21 +2313,24 @@ function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style, p
 
   [-1, 1].forEach((s) => {
     // with a perforated beam only the front plate stays solid
-    if (!(perfH > BH && s < 0)) hhAdd(group, plateX, frameMat, 0, beamMid, s * zPlate);
+    const perfBack = perfH > BH && s < 0;
+    if (!perfBack) hhAdd(group, plateX, frameMat, 0, beamMid, s * zPlate);
     hhAdd(group, lipX, frameMat, 0, lipY, s * (zPlate - t / 2 - LIP / 2));
     if (!(perfH > BH)) hhAdd(group, plateZ, frameMat, s * xPlate, beamMid, 0);
     hhAdd(group, lipZ, frameMat, s * (xPlate - t / 2 - LIP / 2), lipY, 0);
     [-1, 1].forEach((e) => {
       [-0.015, 0.015].forEach((dy) => {
-        hhAdd(
-          group,
-          rivetX,
-          frameMat,
-          e * (w / 2 - F - 0.008),
-          beamMid + dy,
-          s * (zPlate + t / 2)
-        );
-        hhAdd(
+        // no ordinary beam on the perforated sides, so no rivets there
+        if (!perfBack)
+          hhAdd(
+            group,
+            rivetX,
+            frameMat,
+            e * (w / 2 - F - 0.008),
+            beamMid + dy,
+            s * (zPlate + t / 2)
+          );
+        if (!(perfH > BH)) hhAdd(
           group,
           rivetZ,
           frameMat,
@@ -2336,8 +2344,12 @@ function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style, p
 
   // board: on top of the lips (basic) or dropped inside the beams (basket)
   const gap = basket ? 2 * t + 0.002 : 0;
-  const bw = w - 2 * T - gap;
-  const bd = d - 2 * T - gap;
+  // on a perforated level the board sits inside the perforated beams, on
+  // their folded lip (CAD: the board is the size name, 10.6 mm in from
+  // the outside on every side), so its edge is behind the plate
+  const perfLevel = perfH > BH;
+  const bw = perfLevel ? w - 0.0213 : w - 2 * T - gap;
+  const bd = perfLevel ? d - 0.0213 : d - 2 * T - gap;
   const by = basket ? beamTop - BH + t + thickness / 2 : yBoard;
   const board = new THREE.Mesh(
     makeBoardGeometry(bw, thickness, bd, yBoard),
@@ -3797,7 +3809,7 @@ function makePegboardTexture(isBlack) {
 
 /* Perforated beam: a tall plate (180 mm) with five rows of round holes at
    a 25 mm pitch, used in place of an ordinary beam.                    */
-const HH_PERF_H = 0.18;
+const HH_PERF_H = 0.1797; // CAD 타공받침 height
 // Every perforated product uses the same part (CAD 타공받침300/600:
 // 179.7 mm tall, five rows, 25 mm pitch). It needs room to fit in the
 // bay; where the bay is too low the level keeps an ordinary beam.
@@ -3805,9 +3817,11 @@ function hhPerfFit(room) {
   return room >= 0.16 ? Math.min(HH_PERF_H, room) : 0;
 }
 function hhPerfMaterial(len, height, hex, hanging = false) {
-  const cols = Math.floor((len - 0.09) / 0.025) + 1;
-  // holes from 27 mm below the top edge down to the beam's plain band
-  const rows = Math.max(1, Math.floor((height - 0.077) / 0.025) + 1);
+  // CAD: 6 mm holes, 25 mm pitch, first column 49 mm from each end
+  // (300: 9 columns, 600: 21), rows from 27.7 mm under the top edge down
+  // to the plain band at the bottom (179.7 mm part: 5 rows)
+  const cols = Math.round((len - 0.0978) / 0.025) + 1;
+  const rows = Math.max(1, Math.floor((height - 0.0767) / 0.025) + 1);
   const tex = labelTexture(`perf${Math.round(len * 1000)}x${Math.round(height * 1000)}${hanging ? 'h' : ''}`, Math.min(2048, Math.round(len * 2400)), Math.min(2048, Math.round(height * 2400)), (x, cw, ch) => {
     x.fillStyle = '#ffffff';
     x.fillRect(0, 0, cw, ch);
@@ -3817,8 +3831,8 @@ function hhPerfMaterial(len, height, hex, hanging = false) {
     for (let r = 0; r < rows; r++)
       for (let c = 0; c < cols; c++) {
         x.beginPath();
-        const y = (0.027 + r * 0.025) * py;
-        x.ellipse(cw / 2 + (c - (cols - 1) / 2) * 0.025 * px, hanging ? ch - y : y, 0.0032 * px, 0.0032 * py, 0, 0, Math.PI * 2);
+        const y = (0.0277 + r * 0.025) * py;
+        x.ellipse(cw / 2 + (c - (cols - 1) / 2) * 0.025 * px, hanging ? ch - y : y, 0.003 * px, 0.003 * py, 0, 0, Math.PI * 2);
         x.fill();
       }
   });
@@ -3930,8 +3944,10 @@ function hhPerfRise(p, tiers) {
   for (let i = 0; i < tiers - 1; i++) {
     const L = lv[i],
       N = lv[i + 1];
-    const beamBottom = L.h * MM_TO_M - (L.style === 'basket' ? 0 : 0.009) - BH;
-    const ph = hhPerfFit(N.h * MM_TO_M - BH - 0.009 - 0.02 - beamBottom);
+    // the part starts at the board's underside (see addHHLevel)
+    const plateBottom = L.style === 'basket' ? L.h * MM_TO_M - BH : L.h * MM_TO_M - 0.009;
+    const nextBeamBottom = N.h * MM_TO_M - (N.style === 'basket' ? 0 : 0.009) - BH;
+    const ph = hhPerfFit(nextBeamBottom - 0.02 - plateBottom);
     if (ph) out[i] = ph;
   }
   return out;
