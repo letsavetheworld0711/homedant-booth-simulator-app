@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {
   Plus,
   Trash2,
@@ -1898,20 +1899,24 @@ function hhResolveLevels(p, tiers) {
    real figures; flange width, beam height, slot pitch are measured from
    the renders.                                                         */
 const HH = {
-  flange: 0.036, // width of each post face
-  postT: 0.008, // post thickness (two layers + gap)
+  flange: 0.038, // width of each post face (3D: 38 mm)
+  postT: 0.00625, // outer sheet + 4 mm gap + inner layer (3D: 6.25 mm)
   sheet: 0.0012, // steel sheet
   beamH: 0.053, // beam plate height (the 2.1" in the product page)
   lip: 0.012, // beam lip folded inward
-  slotPitch: 0.033,
+  slotPitch: 0.03, // slot pattern repeat (3D: 30 mm); shelf snap step stays HH_LEVEL_STEP
+  slotStart: 0.013, // inner slotted layer starts 13 mm from the corner (3D)
   bottomGap: 0.05, // floor to underside of the lowest beam
 };
 
 const _hhSlotTexCache = {};
 function makeHHSlotTexture(baseHex) {
   if (_hhSlotTexCache[baseHex]) return _hhSlotTexCache[baseHex];
+  // one tile = the inner layer (13 mm from the corner to the hem, ~22 mm)
+  // x one 30 mm pitch, ~2.9 px/mm. Shapes traced from the 3D post: two
+  // windows, wide at the top, tapering into a short slit, slits leaning in.
   const W = 64,
-    H = 76; // one slot pair per tile (28 mm x 33 mm)
+    H = 88;
   const cv = document.createElement('canvas');
   cv.width = W;
   cv.height = H;
@@ -1923,30 +1928,25 @@ function makeHHSlotTexture(baseHex) {
   ctx.fillRect(0, 0, W, H);
   const dark = (r * 299 + g * 587 + b * 114) / 1000 < 128;
   ctx.fillStyle = dark ? '#000000' : '#8f8f92';
-  // one slot: a rectangular window that tapers down into a narrow slit.
-  // `dir` puts the slit on the inner side so the pair leans together.
-  const slot = (x0, dir) => {
-    const w = 12,
-      top = 6,
-      shoulder = 26,
-      neck = 36,
-      bottom = 58,
-      slitW = 2.2;
-    const slitX = dir > 0 ? x0 + w - slitW - 2 : x0 + 2;
+  const slot = (x0, x1, s0, s1) => {
+    const top = 17.6, // 6 mm solid above
+      shoulder = 41, // 8 mm wide part
+      neck = 64.5, // taper
+      bottom = 76; // slit end, 4 mm solid below
     ctx.beginPath();
     ctx.moveTo(x0, top);
-    ctx.lineTo(x0 + w, top);
-    ctx.lineTo(x0 + w, shoulder);
-    ctx.lineTo(slitX + slitW, neck);
-    ctx.lineTo(slitX + slitW, bottom);
-    ctx.lineTo(slitX, bottom);
-    ctx.lineTo(slitX, neck);
+    ctx.lineTo(x1, top);
+    ctx.lineTo(x1, shoulder);
+    ctx.lineTo(s1, neck);
+    ctx.lineTo(s1, bottom);
+    ctx.lineTo(s0, bottom);
+    ctx.lineTo(s0, neck);
     ctx.lineTo(x0, shoulder);
     ctx.closePath();
     ctx.fill();
   };
-  slot(12, 1);
-  slot(32, -1);
+  slot(14.6, 30.7, 23.4, 28.6);
+  slot(40.9, 57.0, 45.3, 50.5);
   const tex = new THREE.CanvasTexture(cv);
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.RepeatWrapping;
@@ -2026,7 +2026,7 @@ function slottedFaceMat(frameMat, kind, fromRight, height) {
     t.needsUpdate = true;
     t.repeat.set(1, height / 0.03);
   });
-  return new THREE.MeshStandardMaterial({
+  const m = new THREE.MeshStandardMaterial({
     color: frameMat.color.getHex(),
     map: tex,
     alphaMap: alpha,
@@ -2036,6 +2036,9 @@ function slottedFaceMat(frameMat, kind, fromRight, height) {
     metalness: frameMat.metalness,
     roughness: frameMat.roughness,
   });
+  if (frameMat.userData && frameMat.userData.frameShade) applyFrameEnv(m);
+  m.userData.finish = 'paint';
+  return m;
 }
 const CORNERS = [
   [-1, -1],
@@ -2058,6 +2061,7 @@ function addSPPosts(group, w, d, h, frameMat) {
   const capTop = capSide.clone();
   if (isLightHex(frameMat.color.getHex())) capTop.color.setHex(frameMat.color.getHex()).multiplyScalar(0.7);
   const capMat = [capSide, capSide, capTop, capSide, capSide, capSide];
+  const spJoints = postJointsFor(frameMat.userData.hh && frameMat.userData.hh.product, 'sp').filter((y) => y > 0.05 && y < h - 0.05);
   CORNERS.forEach(([sx, sz]) => {
     const ex = sx * (w / 2),
       ez = sz * (d / 2);
@@ -2067,6 +2071,8 @@ function addSPPosts(group, w, d, h, frameMat) {
     // safety cap: plastic L over the post end, flush with the top board
     hhAdd(group, capX, capMat, ex - sx * (F / 2), h - CAP_H / 2, ez - sz * (CT / 2));
     hhAdd(group, capZ, capMat, ex - sx * (CT / 2), h - CAP_H / 2, ez - sz * (CT + (F - CT) / 2));
+    // post joints: steel sleeve outside the joint, in the frame paint
+    spJoints.forEach((jy) => addSPJointSleeve(group, ex, ez, sx, sz, jy, frameMat));
   });
 }
 // MAX 200: C-channel with a plain front face, slotted side faces and the
@@ -2180,6 +2186,63 @@ function addLRLevel(group, w, d, yBoard, frameMat, thickness) {
   }
 }
 
+/* Post joints: where two shorter posts are joined into one tall post.
+   Only joints confirmed in the original 3D files are listed - a size that
+   is not here is drawn with one-piece posts (it may still be unconfirmed;
+   see the bracket table in the hand-over notes). Heights in metres from
+   the bottom of the post.
+   - HOMEDANT HOUSE: a plastic connector slides INSIDE both post ends; from
+     outside only a 2 mm band between the two post ends shows.
+     hh_drawer 800x500x2100: posts 1050 + 1050, joint 1.049
+     (홈던트하우스 행거 서랍장 800x500x2100.3dm - '홈던트_기둥1050' x8,
+      '홈던트_기둥연결브라켓' x4 at 988-1110 mm)
+   - HOMEDANT (SP): a painted steel L sleeve WRAPS the outside of the joint
+     (스피드랙_기둥연결브라켓.3dm: 37.5 x 37.5 x 71 mm, 1.2 mm sheet, hemmed
+     edges hooking the post flanges). No assembled SP file gives a joint
+     height yet, so no SP size is listed.                                */
+const POST_JOINTS = [
+  { family: 'hh', productId: 'hh_drawer', width: 800, depth: 500, height: 2100, joints: [1.049] },
+];
+function postJointsFor(p, family) {
+  if (!p) return [];
+  // size by its name (the drawing uses the outside size)
+  const W = p.nomWidth != null ? p.nomWidth : p.width,
+    D = p.nomDepth != null ? p.nomDepth : p.depth;
+  const hit = POST_JOINTS.find(
+    (j) =>
+      j.family === family &&
+      (!j.productId || j.productId === p.productId) &&
+      (!j.width || j.width === W) &&
+      (!j.depth || j.depth === D) &&
+      j.height === p.height
+  );
+  return hit ? hit.joints : [];
+}
+// HOUSE: the visible 2 mm band of the inner plastic connector, same L
+// outline as the post (a hair proud so it reads as a seam, not a stripe)
+const HH_JOINT_BAND = 0.002;
+const HH_JOINT_GAP = 0.0005; // shadow line where a post end meets the connector
+function hhJointMat(frameMat) {
+  const hex = frameMat.color.getHex();
+  const m = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.7, metalness: 0 });
+  m.color.multiplyScalar(isLightHex(hex) ? 0.86 : 1.25);
+  if (frameMat.userData && frameMat.userData.frameShade) applyFrameEnv(m);
+  m.userData.finish = 'cap';
+  return m;
+}
+// SP: steel L sleeve outside the post: 37.5 mm legs, 1.2 mm sheet, 71 mm
+// tall, the leg ends rolled back round the post flange tips
+const SP_SLEEVE = { leg: 0.0375, t: 0.0012, h: 0.071, hemR: 0.0018 };
+function addSPJointSleeve(group, ex, ez, sx, sz, y, mat) {
+  const { leg, t, h, hemR } = SP_SLEEVE;
+  const off = 0.0008 + t / 2; // just outside the post skin
+  hhAdd(group, new THREE.BoxGeometry(leg, h, t), mat, ex - sx * (leg / 2 - off), y, ez + sz * off);
+  hhAdd(group, new THREE.BoxGeometry(t, h, leg), mat, ex + sx * off, y, ez - sz * (leg / 2 - off));
+  const hem = new THREE.CylinderGeometry(hemR, hemR, h, 10);
+  hhAdd(group, hem, mat, ex - sx * (leg - off), y, ez + sz * (off - hemR));
+  hhAdd(group, hem, mat, ex + sx * (off - hemR), y, ez - sz * (leg - off));
+}
+
 function addHHPosts(group, w, d, h, frameMat) {
   const S = specOf(frameMat);
   if (S.kind === 'sp') return addSPPosts(group, w, d, h, frameMat);
@@ -2187,7 +2250,9 @@ function addHHPosts(group, w, d, h, frameMat) {
   const { flange: F, postT: T, sheet: t } = HH;
   const slotMat = frameMat.userData.hh.slotMat;
   slotMat.map.repeat.set(1, h / HH.slotPitch);
-  const innerW = F - T; // inner layer runs from the tip to the other flange
+  // 3D: the inner layer starts 13 mm from the corner and runs to the
+  // rolled hem at the tip; the corner itself is the outer sheet only.
+  const innerW = F - T / 2 - HH.slotStart;
   const outerX = new THREE.BoxGeometry(F, h, t);
   const outerZ = new THREE.BoxGeometry(t, h, F);
   const innerX = new THREE.BoxGeometry(innerW, h, t);
@@ -2211,6 +2276,13 @@ function addHHPosts(group, w, d, h, frameMat) {
   const capTop = capSide.clone();
   capTop.color.setHex(capHex).multiplyScalar(capLight ? 0.7 : 1);
   const capMat = [capSide, capSide, capTop, capSide, capSide, capSide];
+  const joints = postJointsFor(frameMat.userData.hh.product, 'hh').filter((y) => y > 0.05 && y < h - 0.05);
+  const bandMat = joints.length ? hhJointMat(frameMat) : null;
+  const bandX = new THREE.BoxGeometry(F + 0.0006, HH_JOINT_BAND, T + 0.0006);
+  const bandZ = new THREE.BoxGeometry(T + 0.0006, HH_JOINT_BAND, F - T);
+  const gapX = new THREE.BoxGeometry(F + 0.0004, HH_JOINT_GAP, T + 0.0004);
+  const gapZ = new THREE.BoxGeometry(T + 0.0004, HH_JOINT_GAP, F - T);
+  const gapMat = joints.length ? new THREE.MeshBasicMaterial({ color: isLightHex(frameMat.color.getHex()) ? 0x8a8a8a : 0x050505 }) : null;
   [
     [-1, -1],
     [1, -1],
@@ -2223,29 +2295,27 @@ function addHHPosts(group, w, d, h, frameMat) {
     hhAdd(group, outerX, frameMat, ex - sx * (F / 2), h / 2, ez - sz * (t / 2));
     hhAdd(group, outerZ, frameMat, ex - sx * (t / 2), h / 2, ez - sz * (F / 2));
     // inner layer: carries the slots, faces the inside of the shelf
-    hhAdd(
-      group,
-      innerX,
-      slotMat,
-      ex - sx * (F - innerW / 2),
-      h / 2,
-      ez - sz * (T - t / 2)
-    );
-    hhAdd(
-      group,
-      innerZ,
-      slotMat,
-      ex - sx * (T - t / 2),
-      h / 2,
-      ez - sz * (F - innerW / 2)
-    );
-    // rounded fold at each flange tip
-    hhAdd(group, hem, frameMat, ex - sx * F, h / 2, ez - sz * (T / 2));
-    hhAdd(group, hem, frameMat, ex - sx * (T / 2), h / 2, ez - sz * F);
+    const innerC = HH.slotStart + innerW / 2;
+    hhAdd(group, innerX, slotMat, ex - sx * innerC, h / 2, ez - sz * (T - t / 2));
+    hhAdd(group, innerZ, slotMat, ex - sx * (T - t / 2), h / 2, ez - sz * innerC);
+    // rolled hem at each flange tip, inside the 38 mm flange (3D)
+    hhAdd(group, hem, frameMat, ex - sx * (F - T / 2), h / 2, ez - sz * (T / 2));
+    hhAdd(group, hem, frameMat, ex - sx * (T / 2), h / 2, ez - sz * (F - T / 2));
     // top cap closing the L
     const capY = h - CAP_H / 2; // the cap slides down over the post end: its top is flush with the top board
     hhAdd(group, capX, capMat, ex - sx * (F / 2), capY, ez - sz * (T / 2));
     hhAdd(group, capZ, capMat, ex - sx * (T / 2), capY, ez - sz * (T + (F - T) / 2));
+    // post joints: only the connector's band between the post ends shows
+    joints.forEach((jy) => {
+      hhAdd(group, bandX, bandMat, ex - sx * (F / 2), jy, ez - sz * (T / 2));
+      hhAdd(group, bandZ, bandMat, ex - sx * (T / 2), jy, ez - sz * (T + (F - T) / 2));
+      // the hairline gaps where each post end meets the connector
+      [-1, 1].forEach((k) => {
+        const gy = jy + k * (HH_JOINT_BAND / 2 + HH_JOINT_GAP / 2);
+        hhAdd(group, gapX, gapMat, ex - sx * (F / 2), gy, ez - sz * (T / 2));
+        hhAdd(group, gapZ, gapMat, ex - sx * (T / 2), gy, ez - sz * (T + (F - T) / 2));
+      });
+    });
   });
 }
 
@@ -2381,6 +2451,36 @@ function addHHLevel(group, w, d, yBoard, boardMat, frameMat, thickness, style, p
    (HOMEDANT HOUSE uses smooth posts, no slot pattern.)
    If perforated, a separate `postMat` is returned with a clone of the
    slot texture so its UV repeat can be set per post-height in addPosts. */
+/* soft room reflection for painted steel (set once the renderer exists) */
+/* The view is lit mostly by flat ambient light (0.6), which paints every
+   face of a post that points the same way in one tone - and pushes white
+   paint to pure white. For the painted frame only, part of that flat
+   light is swapped for a soft room environment, which comes from above
+   and around and so differs per face, and gives the paint its sheen.
+   Booth walls, floor and everything else keep their lighting.          */
+let FRAME_ENV = null;
+const FRAME_ENV_INTENSITY = 0.15;
+const FRAME_AMBIENT = 0.45; // share of the flat ambient light the frame keeps
+function setFrameEnv(tex) {
+  FRAME_ENV = tex;
+}
+function applyFrameEnv(m) {
+  if (!FRAME_ENV) return;
+  m.envMap = FRAME_ENV;
+  m.envMapIntensity = FRAME_ENV_INTENSITY;
+  m.userData.frameShade = true;
+  m.onBeforeCompile = (sh) => {
+    // the chunk is still an #include here: put in its text with the change
+    sh.fragmentShader = sh.fragmentShader.replace(
+      '#include <lights_fragment_begin>',
+      THREE.ShaderChunk.lights_fragment_begin.replace(
+        'vec3 irradiance = getAmbientLightIrradiance( ambientLightColor );',
+        `vec3 irradiance = getAmbientLightIrradiance( ambientLightColor ) * ${FRAME_AMBIENT.toFixed(2)};`
+      )
+    );
+  };
+  m.customProgramCacheKey = () => 'frameShade';
+}
 function makeMaterials(p, opts = {}) {
   const frameHex = frameHexOf(p.frameColor);
   const boardHex = BOARD_COLORS[p.boardColor] || 0xb89968;
@@ -2388,13 +2488,17 @@ function makeMaterials(p, opts = {}) {
   const isWhiteFrame = p.frameColor === 'white' || isLightHex(frameHex);
   const isWhiteBoard = p.boardColor === 'white';
 
-  // White paint: low metalness + higher roughness so directional light
-  // creates visible shading instead of a perfectly flat white blob.
+  /* Powder-coated steel, from the original 3D file (홈던트하우스 행거 서랍장:
+     '분체도장_기둥_B' = metalness 0, roughness 0.5, no texture). Black used
+     metalness 0.35 before: with nothing to reflect that only darkened it
+     into a flat silhouette. A soft room reflection (frameEnv) gives the
+     paint its gentle sheen and lets faces turned different ways differ. */
   const frame = new THREE.MeshStandardMaterial({
     color: frameHex,
-    metalness: isWhiteFrame ? 0.08 : 0.35,
-    roughness: isWhiteFrame ? 0.62 : 0.55,
+    metalness: 0,
+    roughness: 0.5,
   });
+  applyFrameEnv(frame);
   const board = new THREE.MeshStandardMaterial({
     color: boardHex,
     metalness: 0.05,
@@ -2473,9 +2577,10 @@ function makeMaterials(p, opts = {}) {
     postMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       map: tex,
-      metalness: isWhiteFrame ? 0.1 : 0.2,
-      roughness: isWhiteFrame ? 0.62 : 0.55,
+      metalness: 0,
+      roughness: 0.5,
     });
+    applyFrameEnv(postMat);
   }
   if (opts.house) {
     const slotTex = makeHHSlotTexture(frameHex).clone();
@@ -2486,6 +2591,7 @@ function makeMaterials(p, opts = {}) {
       metalness: frame.metalness,
       roughness: frame.roughness,
     });
+    applyFrameEnv(slotMat);
     const hhInfo = {
       style: p.shelfStyle === 'basket' ? 'basket' : 'basic',
       slotMat,
@@ -2494,6 +2600,12 @@ function makeMaterials(p, opts = {}) {
     frame.userData.hh = hhInfo;
     foot.userData.hh = hhInfo;
   }
+  // photo mode gives these surfaces their real finish (the booth view keeps
+  // its own tuned values): powder-coated steel, plastic caps
+  frame.userData.finish = 'paint';
+  postMat.userData.finish = 'paint';
+  if (frame.userData.hh) frame.userData.hh.slotMat.userData.finish = 'paint';
+  foot.userData.finish = 'cap';
   return { frame, board, foot, postMat, frameHex };
 }
 
@@ -2819,6 +2931,7 @@ function displayKit(group, seed) {
    standing on y = 0. Instances are clones that share the cached geometry
    and materials, marked sharedAsset so product clean-up leaves them be. */
 const PROP_MODELS = {};
+const PROP_COLOR_SCALE = 0.88; // prop colours are toned down for the bright live view
 const FRAME_TURN = -Math.PI / 2; // the frame models face along x
 let _propLoad = null;
 function loadPropModels() {
@@ -2863,7 +2976,7 @@ function loadPropModels() {
                     m.map.encoding = THREE.LinearEncoding;
                     m.map.needsUpdate = true;
                   }
-                  m.color.multiplyScalar(0.88); // scene lights run bright
+                  m.color.multiplyScalar(PROP_COLOR_SCALE); // scene lights run bright
                   m.metalness = 0;
                   m.needsUpdate = true;
                 });
@@ -4098,17 +4211,9 @@ function buildHHDrawerHanger(group, p, tpl) {
     [-0.06, 0.06].forEach((x) => hhAdd(group, post, paint, x, y0 + fh / 2, zf + 0.01));
   });
 
-  // 2100 posts are two 1050 lengths joined by a sleeve at mid height
-  if (p.height === 2100) {
-    const sx = new THREE.BoxGeometry(F + 0.003, 0.134, 0.0015);
-    const sz = new THREE.BoxGeometry(0.0015, 0.134, F + 0.003);
-    [-1, 1].forEach((a) =>
-      [-1, 1].forEach((b) => {
-        hhAdd(group, sx, mats.frame, a * (w / 2 - F / 2), 1.049, b * (d / 2 + 0.0008));
-        hhAdd(group, sz, mats.frame, a * (w / 2 + 0.0008), 1.049, b * (d / 2 - F / 2));
-      })
-    );
-  }
+  // 2100 posts: two 1050 lengths joined by a connector INSIDE the post
+  // (3D: 4 brackets 988-1110 mm). Only the band between the post ends
+  // shows; addHHPosts draws it from POST_JOINTS.
   addPostFeet(group, w, d, mats.foot, 0.025);
 }
 
@@ -4898,7 +5003,7 @@ function buildProductMeshInner(p, tpl) {
   // HOMEDANT HOUSE: draw the real outside width and depth (see hhOuterSize)
   if (isLevelProduct(tpl)) {
     const o = hhOuterSize(p);
-    p = { ...p, width: o.width, depth: o.depth, caster2in: hhSmallCaster(p) };
+    p = { ...p, width: o.width, depth: o.depth, nomWidth: p.width, nomDepth: p.depth, caster2in: hhSmallCaster(p) };
   }
   switch (tpl.type) {
     case 'shelf':
@@ -5918,6 +6023,9 @@ export {
   buyerShortName,
   tierChoices,
   fitTier,
+  PROP_MODELS,
+  PROP_COLOR_SCALE,
+  loadPropModels,
 };
 
 function BoothSimulator() {
@@ -6041,6 +6149,12 @@ function BoothSimulator() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mount.appendChild(renderer.domElement);
     rendererRef.current = renderer;
+    // soft room for the painted frame's reflections (products only)
+    {
+      const pm = new THREE.PMREMGenerator(renderer);
+      setFrameEnv(pm.fromScene(new RoomEnvironment(), 0.04).texture);
+      pm.dispose();
+    }
 
     // lights
     const amb = new THREE.AmbientLight(0xffffff, 0.6);

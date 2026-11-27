@@ -19,6 +19,9 @@
    before.                                                              */
 import * as THREE from 'three';
 
+// bump when a change alters how a saved setting renders
+export const ENGINE_VERSION = 'phase3.4';
+
 export const QUALITY = {
   draft: { label: 'Draft', keySamples: 1, skySamples: 0, ss: 1, shadowMap: 2048 },
   standard: { label: 'Standard', keySamples: 10, skySamples: 14, ss: 2, shadowMap: 2048 },
@@ -39,7 +42,9 @@ export function solveCamera(cal, W, H) {
   const pxPerM = Math.max(1, ((cal.floorY - cal.refY) * H) / cal.refH);
   const camH = ((cal.floorY - cal.horizonY) * H) / pxPerM;
   const dist = f / pxPerM; // camera to the back wall
-  return { f, pxPerM, camH, dist, cx: W / 2, cy: cal.horizonY * H };
+  // cx: where depth lines (perpendicular to the back wall) meet across the
+  // picture - the centre for an uncropped photo, elsewhere for a cropped one
+  return { f, pxPerM, camH, dist, cx: (cal.vpX != null ? cal.vpX : 0.5) * W, cy: cal.horizonY * H };
 }
 
 function makeCamera(sol, W, H, yawDeg) {
@@ -176,14 +181,103 @@ export function guessFloorLine(img) {
   return bestY / H;
 }
 
+/* ---------- props on the shelf (same 3D scene, same light) ----------
+   The levels are read from the product's own boards, so props always
+   stand on the real board tops. props: [{ key, level (1 = bottom),
+   fx, fz (-1..1 across / front-back of the free space), rot (deg),
+   width (m, real size) }]. models: PROP_MODELS from the simulator.     */
+export function findLevels(obj) {
+  obj.updateMatrixWorld(true);
+  const found = [];
+  obj.traverse((m) => {
+    if (!m.isMesh || m.userData.photoProp) return;
+    const b = new THREE.Box3().setFromObject(m),
+      s = b.getSize(new THREE.Vector3());
+    if (s.y > 0.006 && s.y < 0.03 && s.x > 0.2 && s.z > 0.2) found.push(b);
+  });
+  found.sort((a, b) => a.max.y - b.max.y);
+  const levels = [];
+  found.forEach((b) => {
+    const last = levels[levels.length - 1];
+    if (last && b.max.y - last.max.y < 0.03) last.union(b);
+    else levels.push(b.clone());
+  });
+  return levels;
+}
+// A prop stands on a board (level) or inside another prop (in = index of
+// that prop in the list, e.g. lemons in a basket). It is turned first
+// (rx/ry/rz or rot), then set down so its lowest point touches the surface.
+export function addProps(obj, props, models) {
+  if (!props || !props.length || !models) return [];
+  const levels = findLevels(obj);
+  const placed = [];
+  const deg = Math.PI / 180;
+  props.forEach((pr, idx) => {
+    const m = models[pr.key];
+    if (!m) return void placed.push(null);
+    const inst = m.scene.clone(true);
+    const sc = pr.width ? pr.width / Math.max(m.size.x, m.size.z) : 1;
+    inst.scale.setScalar(sc);
+    inst.rotation.set((pr.rx || 0) * deg, (pr.ry != null ? pr.ry : pr.rot || 0) * deg, (pr.rz || 0) * deg);
+    inst.traverse((o) => {
+      o.userData.photoProp = true;
+      o.userData.propFinish = (m.def && m.def.photo) || null;
+      if (o.isMesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+      }
+    });
+    obj.add(inst);
+    obj.updateMatrixWorld(true);
+    const own = new THREE.Box3().setFromObject(inst);
+    const hx = (own.max.x - own.min.x) / 2,
+      hz = (own.max.z - own.min.z) / 2;
+    let x, z, floorY;
+    const host = pr.in != null ? placed[pr.in] : null;
+    if (host) {
+      // inside a container: offset (m) from its centre, on its inner floor
+      x = (host.box.min.x + host.box.max.x) / 2 + (pr.dx || 0);
+      z = (host.box.min.z + host.box.max.z) / 2 + (pr.dz || 0);
+      floorY = host.box.min.y + (pr.floor != null ? pr.floor : 0.012);
+    } else {
+      const lv = levels[(pr.level || 1) - 1];
+      if (!lv) {
+        obj.remove(inst);
+        return void placed.push(null);
+      }
+      const cx = (lv.min.x + lv.max.x) / 2,
+        cz = (lv.min.z + lv.max.z) / 2;
+      const freeX = Math.max(0, (lv.max.x - lv.min.x) / 2 - hx - 0.035),
+        freeZ = Math.max(0, (lv.max.z - lv.min.z) / 2 - hz - 0.02);
+      x = cx + (pr.fx || 0) * freeX;
+      z = cz + (pr.fz || 0) * freeZ;
+      floorY = lv.max.y;
+    }
+    const c = own.getCenter(new THREE.Vector3());
+    inst.position.x += x - c.x;
+    inst.position.z += z - c.z;
+    inst.position.y += floorY + (pr.lift || 0) + 0.0003 - own.min.y;
+    obj.updateMatrixWorld(true);
+    placed.push({ key: pr.key, box: new THREE.Box3().setFromObject(inst), size: own.getSize(new THREE.Vector3()) });
+  });
+  return placed;
+}
+
 /* ---------- materials: same colours, managed correctly ----------
    The simulator works without colour management; for the photo the
    colours are converted to linear and the output is sRGB, so lighting
    adds up the way a camera sees it. The hue the customer sees on a lit
    face stays the product colour.                                      */
-function photoMaterials(root) {
+/* finish (photo mode's own surface values; the booth keeps its tuned ones):
+   paint: powder-coated steel - no metal, satin sheen
+   cap:   moulded plastic foot
+   and no self-glow: the booth lifts white undersides with emissive, which in
+   a photo turns every face of the frame into the same flat white.      */
+export const DEF_FINISH = { on: true, paintRough: 0.4, capRough: 0.7, noGlow: true };
+function photoMaterials(root, propScale, finish) {
+  const F = finish && finish.on ? Object.assign({}, DEF_FINISH, finish) : null;
   const seen = new Map();
-  const conv = (m) => {
+  const conv = (m, pf) => {
     if (!m) return m;
     if (seen.has(m)) return seen.get(m);
     // userData can point back at the material itself (board.userData.faceMats),
@@ -194,6 +288,48 @@ function photoMaterials(root) {
     m.userData = ud;
     if (n.color) n.color.convertSRGBToLinear();
     if (n.emissive) n.emissive.convertSRGBToLinear();
+    // the booth view's own frame reflection; photo mode lights with its room
+    if (n.envMap && !(n.userData && n.userData.keepEnv)) n.envMap = null;
+    if (F) {
+      if (ud.finish === 'paint') {
+        n.metalness = 0;
+        n.roughness = F.paintRough;
+      } else if (ud.finish === 'cap') {
+        n.metalness = 0;
+        n.roughness = F.capRough;
+      }
+      if (F.noGlow && n.emissive && !n.emissiveMap) n.emissive.setRGB(0, 0, 0);
+      // glass (glTF KHR_materials_transmission, which this three.js does not
+      // read): see-through, tinted by its own colour map, with reflections
+      // three r128 turns glTF transmission into transparency, which would
+      // make the wine inside the bottles vanish: liquids are solid here
+      if (n.transmission) n.transmission = 0;
+      if (pf && pf.glass && /_glass_/.test(n.name || '')) {
+        n.transparent = true;
+        n.opacity = pf.glass.opacity != null ? pf.glass.opacity : 0.32;
+        n.depthWrite = false;
+        n.roughness = 0.06;
+        n.metalnessMap = null;
+        n.roughnessMap = null;
+        n.metalness = 0;
+        n.userData.envBoost = 2.2; // glass shows mostly reflection
+        n.normalMap = null; // its dust/scratch normals read as specks over the labels
+      }
+      if (pf) {
+        if (pf.aoFromArm && !n.aoMap && n.roughnessMap) {
+          n.aoMap = n.roughnessMap; // ARM: red = ambient occlusion
+          n.aoMapIntensity = 1;
+        }
+        if (pf.metalness != null) {
+          n.metalnessMap = null;
+          n.metalness = pf.metalness;
+        }
+        if (pf.roughness != null) {
+          n.roughnessMap = null;
+          n.roughness = pf.roughness;
+        }
+      }
+    }
     if (n.map) {
       n.map = n.map.clone();
       n.map.encoding = THREE.sRGBEncoding;
@@ -202,9 +338,17 @@ function photoMaterials(root) {
     seen.set(m, n);
     return n;
   };
+  const propSeen = new Set();
   root.traverse((o) => {
     if (!o.isMesh) return;
-    o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
+    const pf = o.userData.propFinish;
+    o.material = Array.isArray(o.material) ? o.material.map((m) => conv(m, pf)) : conv(o.material, pf);
+    if (F && o.material.aoMap && !o.geometry.attributes.uv2) o.geometry.setAttribute('uv2', o.geometry.attributes.uv);
+    if (o.userData.photoProp && o.userData.sharedAsset && propScale && !propSeen.has(o.material)) {
+      // the booth view's simple props are toned down for its bright light
+      propSeen.add(o.material);
+      o.material.color.multiplyScalar(1 / propScale);
+    }
     o.castShadow = true;
     o.receiveShadow = true;
   });
@@ -310,7 +454,15 @@ const dirFrom = (azDeg, elDeg) => {
  *         keyI, skyI, ambI, color}, look:{...}, quality, wall:true }
  * returns { W, H, beauty:Float32Array(premultiplied RGBA), shadow, ao, depthTop }
  */
-export async function renderLayers(product, bg, opts, onProgress) {
+// one render at a time: the preview and the final render share one WebGL
+// renderer, and two renders running at once would mix their pictures
+let _queue = Promise.resolve();
+export function renderLayers(product, bg, opts, onProgress) {
+  const run = _queue.then(() => renderLayersNow(product, bg, opts, onProgress));
+  _queue = run.catch(() => {});
+  return run;
+}
+async function renderLayersNow(product, bg, opts, onProgress) {
   const q = QUALITY[opts.quality] || QUALITY.draft;
   const outW = Math.round(bg.width * (opts.outScale || 1)),
     outH = Math.round(bg.height * (opts.outScale || 1));
@@ -325,7 +477,8 @@ export async function renderLayers(product, bg, opts, onProgress) {
 
   // the product, placed against the back wall
   const obj = product.clone(true);
-  photoMaterials(obj);
+  addProps(obj, opts.props, opts.propModels);
+  photoMaterials(obj, opts.propColorScale, opts.finish);
   const box0 = new THREE.Box3().setFromObject(obj);
   const depth = box0.max.z - box0.min.z;
   const pl = opts.place || {};
@@ -360,7 +513,7 @@ export async function renderLayers(product, bg, opts, onProgress) {
   const envRT = makeEnvironment(renderer, L);
   scene.environment = envRT.texture;
   obj.traverse((o) => {
-    if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => (m.envMapIntensity = L.envI != null ? L.envI : 0.9));
+    if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => (m.envMapIntensity = (L.envI != null ? L.envI : 0.9) * ((m.userData && m.userData.envBoost) || 1)));
   });
   const amb = new THREE.AmbientLight(0xffffff, L.ambI != null ? L.ambI : 0.03);
   const hemi = new THREE.HemisphereLight(
@@ -369,8 +522,42 @@ export async function renderLayers(product, bg, opts, onProgress) {
     L.hemiI != null ? L.hemiI : 0
   );
   scene.add(amb, hemi);
+  // headroom: each light sample is read back as 8 bits, so it is rendered
+  // HS times darker and brightened again in linear light. Without it a
+  // white face in the window light clips to flat white in every sample.
+  const HS = opts.hdrScale || 1;
+  amb.intensity /= HS;
+  hemi.intensity /= HS;
+  const scaled = new Set();
+  obj.traverse((o) => {
+    if (o.isMesh) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+      if (scaled.has(m)) return; // materials are shared between meshes
+      scaled.add(m);
+      m.envMapIntensity /= HS;
+      if (m.emissive) m.emissive.multiplyScalar(1 / HS);
+    });
+  });
   const key = new THREE.DirectionalLight(lc, 1);
-  const sky = new THREE.DirectionalLight(0xffffff, 1);
+  // the room's light carries the room's colour (white light from every
+  // direction would turn a white frame grey-blue against a warm room)
+  const skyCol = new THREE.Color(0xffffff);
+  if (L.roomTint && (L.wallColor || L.skyColor)) {
+    const a = L.wallColor || L.skyColor,
+      b = L.skyColor || a;
+    const c = [0, 1, 2].map((k) => lin((a[k] + b[k]) / 2)); // background colours are sRGB
+    const y = Math.max(1e-3, 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]);
+    const t = Math.min(1, L.roomTint);
+    skyCol.setRGB(...c.map((v) => 1 + (v / y - 1) * t)); // same brightness, room's hue
+  }
+  // light from below is the floor's bounce: it has the floor's colour
+  const bounceCol = skyCol.clone();
+  if (L.roomTint && L.groundColor) {
+    const g = L.groundColor.map(lin);
+    const y = Math.max(1e-3, 0.2126 * g[0] + 0.7152 * g[1] + 0.0722 * g[2]);
+    const t = Math.min(1, L.roomTint);
+    bounceCol.setRGB(...g.map((v) => 1 + (v / y - 1) * t));
+  }
+  const sky = new THREE.DirectionalLight(skyCol, 1);
   [key, sky].forEach((dl) => {
     dl.castShadow = true;
     dl.target.position.copy(pcen);
@@ -384,12 +571,44 @@ export async function renderLayers(product, bg, opts, onProgress) {
     sc.near = 0.1;
     sc.far = 30;
     sc.updateProjectionMatrix();
-    dl.shadow.mapSize.set(q.shadowMap, q.shadowMap);
+    // the room light only gives soft occlusion: a coarser map for it blends
+    // the separate sample directions into one smooth shade instead of
+    // a set of faint overlapping shadow edges
+    const ms = dl === sky && opts.softSky ? Math.max(512, q.shadowMap / 4) : q.shadowMap;
+    dl.shadow.mapSize.set(ms, ms);
     dl.shadow.bias = -0.00015;
     dl.shadow.normalBias = 0.004;
     dl.shadow.radius = 1.5;
     scene.add(dl, dl.target);
   });
+
+  // the window as a light at a real distance (keyDist m): light falls off
+  // across the product - nearer parts brighter - instead of every face that
+  // points the same way getting exactly the same light. Used for the
+  // product only; the wall and floor shadows keep the far light they were
+  // calibrated with.
+  const keyDist = L.keyDist > 0 ? L.keyDist : 0;
+  let spot = null,
+    spotNorm = 1;
+  if (keyDist) {
+    const reachK = keyDist * 3; // light reaches zero here (three's non-physical falloff)
+    const rr = Math.max(psize.x, psize.y, psize.z) * 0.75;
+    spot = new THREE.SpotLight(lc, 1, reachK, Math.min(1.2, Math.atan(rr / keyDist) + 0.35), 0.25, 2);
+    spotNorm = 1 / Math.pow(1 - 1 / 3, 2); // same light as before at the product's centre
+    spot.castShadow = true;
+    // a window is a wide light: softer shadow edges per sample, so the
+    // samples blend into one soft shadow instead of overlapping edges
+    const sm = opts.softSky ? Math.max(512, q.shadowMap / 2) : q.shadowMap;
+    spot.shadow.mapSize.set(sm, sm);
+    spot.shadow.bias = -0.00015;
+    spot.shadow.normalBias = 0.004;
+    spot.shadow.radius = 1.5;
+    spot.shadow.camera.near = 0.1;
+    spot.shadow.camera.far = reachK;
+    spot.target.position.copy(pcen);
+    spot.visible = false;
+    scene.add(spot, spot.target);
+  }
 
   const nK = q.keySamples,
     nS = q.skySamples,
@@ -440,6 +659,74 @@ export async function renderLayers(product, bg, opts, onProgress) {
   const wKey = [0, 0, 0],
     wSky = [0, 0, 0];
 
+  // props: a mask of where they are visible (the posts in front still hide
+  // them), and how much they shade the boards they stand on. The room's
+  // even environment light has no shadows, so without this a prop looks
+  // set down on a lit board without touching it.
+  const propMeshes = [],
+    prodMeshes = [];
+  obj.traverse((o) => o.isMesh && (o.userData.photoProp ? propMeshes : prodMeshes).push(o));
+  const hasProps = propMeshes.length > 0;
+  const propMask = hasProps ? new Float32Array(W * H) : null;
+  const propAO = hasProps ? new Float32Array(W * H) : null;
+  const upFace = hasProps ? new Float32Array(W * H) : null; // product surface facing up (0..1)
+  let wProp = 0;
+  const contactMat = new THREE.ShadowMaterial({ opacity: 1 });
+  const saved = new Map();
+  const setMode = (mode) => {
+    // 'normal' | 'mask' (props only, product hides them) | 'contact' (product
+    // shows only the shadow the props cast on it)
+    prodMeshes.forEach((o) => {
+      if (!saved.has(o)) saved.set(o, { m: o.material, c: o.castShadow, r: o.renderOrder });
+      const sv = saved.get(o);
+      o.material = mode === 'contact' ? contactMat : sv.m;
+      o.castShadow = mode === 'contact' ? false : sv.c;
+      o.renderOrder = mode === 'mask' ? -1 : sv.r;
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+        m.colorWrite = mode !== 'mask';
+        m.depthWrite = true;
+      });
+    });
+    propMeshes.forEach((o) =>
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+        m.colorWrite = mode !== 'contact';
+        m.depthWrite = mode !== 'contact';
+      })
+    );
+  };
+  let nrm = null;
+  if (opts.debugNormals) {
+    // view-space normals of everything (for checking the shading per face)
+    floor.visible = wall.visible = false;
+    key.visible = sky.visible = false;
+    scene.overrideMaterial = new THREE.MeshNormalMaterial();
+    renderer.render(scene, cam);
+    scene.overrideMaterial = null;
+    nrm = new Uint8ClampedArray(read());
+  }
+  if (hasProps) {
+    floor.visible = wall.visible = false;
+    key.visible = sky.visible = false;
+    setMode('mask');
+    renderer.render(scene, cam);
+    const mp = read();
+    for (let j = 0, i = 3; j < W * H; j++, i += 4) propMask[j] = mp[i] / 255;
+    setMode('normal');
+    // normal pass: only surfaces that face up (board tops) can be shaded by
+    // a prop standing on them, never a board's underside or front edge.
+    // The camera is level, so the view-space normal's y is the world y.
+    propMeshes.forEach((o) => (o.visible = false));
+    scene.overrideMaterial = new THREE.MeshNormalMaterial();
+    renderer.render(scene, cam);
+    scene.overrideMaterial = null;
+    propMeshes.forEach((o) => (o.visible = true));
+    const np = read();
+    for (let j = 0, i = 0; j < W * H; j++, i += 4) {
+      const ny = (np[i + 1] / 255) * 2 - 1;
+      upFace[j] = np[i + 3] > 0 ? Math.min(1, Math.max(0, (ny - 0.6) / 0.3)) : 0;
+    }
+  }
+
   for (let s = 0; s < N; s++) {
     const isKey = s < nK;
     let dir;
@@ -463,23 +750,34 @@ export async function renderLayers(product, bg, opts, onProgress) {
     const lp = pcen.clone().add(dir.clone().multiplyScalar(12));
     key.visible = isKey;
     sky.visible = !isKey;
+    if (!isKey) sky.color.copy(skyCol).lerp(bounceCol, Math.min(1, Math.max(0, -dir.y * 2.5)));
     (isKey ? key : sky).position.copy(lp);
-    key.intensity = nK ? (keyI * N) / nK : 0;
-    sky.intensity = nS ? (skyI * N) / nS : 0;
-    if (!nS) amb.intensity = (L.ambI != null ? L.ambI : 0.03) + skyI * 0.6; // draft: no sky samples
+    key.intensity = (nK ? (keyI * N) / nK : 0) / HS;
+    sky.intensity = (nS ? (skyI * N) / nS : 0) / HS;
+    if (!nS) amb.intensity = ((L.ambI != null ? L.ambI : 0.03) + skyI * 0.6) / HS; // draft: no sky samples
     renderer.shadowMap.needsUpdate = true;
 
     // beauty pass: product only, transparent background
     floor.visible = false;
     wall.visible = false;
     hideProduct(false);
+    if (spot && isKey) {
+      spot.position.copy(pcen).add(dir.clone().multiplyScalar(keyDist));
+      spot.intensity = key.intensity * spotNorm;
+      spot.visible = true;
+      key.visible = false;
+    }
     renderer.render(scene, cam);
+    if (spot && isKey) {
+      spot.visible = false;
+      key.visible = true;
+    }
     let p = read();
     for (let i = 0, j = 0; j < W * H; i += 4, j++) {
       const a = p[i + 3] / 255;
-      beauty[i] += S2L[p[i]] * a; // linear light, premultiplied
-      beauty[i + 1] += S2L[p[i + 1]] * a;
-      beauty[i + 2] += S2L[p[i + 2]] * a;
+      beauty[i] += S2L[p[i]] * a * HS; // linear light, premultiplied
+      beauty[i + 1] += S2L[p[i + 1]] * a * HS;
+      beauty[i + 2] += S2L[p[i + 2]] * a * HS;
       beauty[i + 3] += a;
     }
     // shadow pass: only what the invisible floor and wall catch
@@ -496,10 +794,23 @@ export async function renderLayers(product, bg, opts, onProgress) {
     acc[2] += wts[2];
     for (let i = 3, j = 0; j < W * H; i += 4, j++) if (rid[j]) tgt[j] += (p[i] / 255) * wts[rid[j]];
     hideProduct(false);
+    // props shading the boards, for the room light from this direction
+    if (hasProps && !isKey) {
+      floor.visible = wall.visible = false;
+      setMode('contact');
+      renderer.shadowMap.needsUpdate = true;
+      renderer.render(scene, cam);
+      const cp = read();
+      const w = Math.max(0, dir.y);
+      wProp += w;
+      for (let j = 0, i = 3; j < W * H; j++, i += 4) propAO[j] += (cp[i] / 255) * w;
+      setMode('normal');
+    }
     if (onProgress) onProgress((s + 1) / N);
     if (s % 2 === 1) await new Promise((r) => setTimeout(r, 0)); // keep the page responsive
   }
   for (let i = 0; i < beauty.length; i++) beauty[i] /= N;
+  if (propAO && wProp > 0) for (let j = 0; j < W * H; j++) propAO[j] /= wProp;
   envRT.dispose();
   for (let j = 0; j < W * H; j++) {
     const r = rid[j];
@@ -519,6 +830,10 @@ export async function renderLayers(product, bg, opts, onProgress) {
     ao,
     hasAO: nS > 0,
     rid,
+    propMask,
+    upFace,
+    propAO: wProp > 0 ? propAO : null,
+    nrm,
     sol,
     footPx: [((foot.x + 1) / 2) * outW, ((1 - foot.y) / 2) * outH],
   };
@@ -531,7 +846,7 @@ export async function renderLayers(product, bg, opts, onProgress) {
    a part of the second - so they never darken the same light twice.
    look: { keyShare, shadowK, aoK, exposure, whiteBalance[3], blur,
            shadowBlur, grain, fade }                                    */
-const DEF_LOOK = { keyShare: 0.25, shadowK: 1, aoK: 0.4, aoFloorK: 0.85, exposure: 1, whiteBalance: [1, 1, 1], blur: 0.6, shadowBlur: 2.5, grain: 1.4, fade: 0.45 };
+const DEF_LOOK = { keyShare: 0.25, shadowK: 1, aoK: 0.4, aoFloorK: 0.85, contactK: 0.75, exposure: 1, whiteBalance: [1, 1, 1], blur: 0.6, texBlur: null, shoulder: null, shadowBlur: 2.5, grain: 1.4, fade: 0.45 };
 
 // box-average a layer from render size down to output size
 function downsample(src, W, H, ss, ch) {
@@ -581,7 +896,31 @@ function blur(a, w, h, ch, sigma) {
 export function composite(bg, layers, look) {
   const { W, H, outW, outH, ss } = layers;
   const lk = Object.assign({}, DEF_LOOK, look || {});
-  const prod = blur(downsample(layers.beauty, W, H, ss, 4), outW, outH, 4, lk.blur);
+  const beautyC = layers.beauty;
+  if (layers.propAO && lk.contactK > 0) {
+    // contact shade on the product's own surfaces (boards) under the props
+    var shaded = new Float32Array(beautyC.length);
+    for (let j = 0, i = 0; j < W * H; j++, i += 4) {
+      const f = 1 - lk.contactK * layers.propAO[j] * (1 - layers.propMask[j]) * (layers.upFace ? layers.upFace[j] : 1);
+      shaded[i] = beautyC[i] * f;
+      shaded[i + 1] = beautyC[i + 1] * f;
+      shaded[i + 2] = beautyC[i + 2] * f;
+      shaded[i + 3] = beautyC[i + 3];
+    }
+  }
+  // the outline is softened to sit into the photo (lk.blur); inside the
+  // outline only lk.texBlur, so the weave, wood grain and glaze stay crisp
+  const prodS = downsample(shaded || beautyC, W, H, ss, 4);
+  let prod;
+  if (lk.texBlur != null && lk.texBlur < lk.blur) {
+    const soft = blur(prodS.slice(), outW, outH, 4, lk.blur);
+    const sharp = blur(prodS, outW, outH, 4, lk.texBlur);
+    for (let j = 0, i = 0; j < outW * outH; j++, i += 4) {
+      const t = Math.min(1, Math.max(0, (Math.min(soft[i + 3], sharp[i + 3]) - 0.92) / 0.08));
+      for (let k = 0; k < 4; k++) soft[i + k] += (sharp[i + k] - soft[i + k]) * t;
+    }
+    prod = soft;
+  } else prod = blur(prodS, outW, outH, 4, lk.blur);
   const sh = blur(downsample(layers.shadow, W, H, ss, 1), outW, outH, 1, lk.shadowBlur);
   const ao = layers.hasAO ? blur(downsample(layers.ao, W, H, ss, 1), outW, outH, 1, lk.shadowBlur * 0.6) : null;
   // floor or wall under each pixel: the floor right under furniture reads
@@ -603,6 +942,23 @@ export function composite(bg, layers, look) {
         if (y < by0) by0 = y;
         if (y > by1) by1 = y;
       }
+  // highlight roll-off on the product, like a camera's shoulder: values
+  // above the knee (linear) approach white gradually instead of reaching
+  // it, so the brightest paint and glaze stay soft; mid-tones are untouched
+  if (lk.shoulder > 0 && lk.shoulder < 1) {
+    const k = lk.shoulder,
+      r = 1 - k;
+    for (let i = 0; i < prod.length; i += 4) {
+      const a = prod[i + 3];
+      if (a < 1e-4) continue;
+      const y = (0.2126 * prod[i] + 0.7152 * prod[i + 1] + 0.0722 * prod[i + 2]) / a;
+      if (y <= k) continue;
+      const f = (k + r * (1 - Math.exp(-(y - k) / r))) / y;
+      prod[i] *= f;
+      prod[i + 1] *= f;
+      prod[i + 2] *= f;
+    }
+  }
   const span = Math.max(20, bx1 - bx0) * lk.fade;
   const c = document.createElement('canvas');
   c.width = outW;
@@ -674,5 +1030,53 @@ export function layerImages(layers) {
     ao: mk((d) => {
       for (let j = 0; j < W * H; j++) gray(d, j, 255 - (layers.hasAO ? layers.ao[j] : 0) * 255);
     }),
+    ...(layers.propMask
+      ? {
+          propMask: mk((d) => {
+            for (let j = 0; j < W * H; j++) gray(d, j, layers.propMask[j] * 255);
+          }),
+          propContact: mk((d) => {
+            for (let j = 0; j < W * H; j++) gray(d, j, 255 - (layers.propAO ? layers.propAO[j] : 0) * 255);
+          }),
+        }
+      : {}),
   };
+}
+
+/* product-centred framing: a crop of the finished picture (background and
+   product together, so the perspective is untouched) in which the product,
+   feet included, fills `fill` of the height. aspect = width / height.   */
+export function productBox(layers) {
+  const { W, H, ss, beauty } = layers;
+  let x0 = W, x1 = -1, y0 = H, y1 = -1;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      if (beauty[(y * W + x) * 4 + 3] > 0.5) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+  if (x1 < 0) return null;
+  return { x0: x0 / ss, x1: (x1 + 1) / ss, y0: y0 / ss, y1: (y1 + 1) / ss };
+}
+export function frameProduct(canvas, layers, fill = 0.83, aspect = 0.8) {
+  const b = productBox(layers);
+  if (!b) return canvas;
+  const cw = canvas.width,
+    ch = canvas.height;
+  let h = Math.min(ch, (b.y1 - b.y0) / fill);
+  let w = Math.min(cw, h * aspect);
+  h = Math.min(h, w / aspect);
+  const spare = h - (b.y1 - b.y0);
+  // a little more room under the feet than over the top (floor + shadow)
+  let y = b.y0 - spare * 0.45;
+  let x = (b.x0 + b.x1) / 2 - w / 2;
+  x = Math.max(0, Math.min(cw - w, x));
+  y = Math.max(0, Math.min(ch - h, y));
+  const c = document.createElement('canvas');
+  c.width = Math.round(w);
+  c.height = Math.round(h);
+  c.getContext('2d').drawImage(canvas, Math.round(x), Math.round(y), c.width, c.height, 0, 0, c.width, c.height);
+  return c;
 }
